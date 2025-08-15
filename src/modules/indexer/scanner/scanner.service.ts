@@ -10,14 +10,19 @@ import { SolanaService } from '../services/solana.service'
 import { Logger } from '@/lib'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
+import { JOB_TYPES, QUEUE_NAME } from '../../queue/queue.constant'
+import { DELAYS, SCAN_LIMITS } from './scanner.constant'
+import { sleep } from '@/utils/helper'
 
 @Injectable()
 export class ScannerService {
-  private readonly logger: Logger = new Logger(ScannerService.name)
-  private isBackwardScanComplete = false
-  private isProcessingQueue = false
-  private startupComplete = false
+  private readonly logger = new Logger(ScannerService.name)
   private readonly programAddress: PublicKey
+  private readonly state = {
+    isBackwardScanComplete: false,
+    isProcessingQueue: false,
+    startupComplete: false,
+  }
 
   constructor(
     @Inject(indexerConfig.KEY)
@@ -25,7 +30,7 @@ export class ScannerService {
     @InjectModel(TransactionEvent.name)
     private readonly transactionModel: Model<TransactionEvent>,
     private readonly solanaService: SolanaService,
-    @InjectQueue('transaction-processing')
+    @InjectQueue(QUEUE_NAME.TRANSACTION_PROCESSOR)
     private readonly transactionQueue: Queue,
   ) {
     this.programAddress = new PublicKey(this.config.liquidityBookProgramAddress)
@@ -33,25 +38,25 @@ export class ScannerService {
 
   async onModuleInit() {
     this.logger.log('Initializing Scanner Service...')
-    await this.initializeScanner()
+    // Wait a bit before starting to ensure other services are ready
+    sleep(DELAYS.INITIALIZATION).then(() => this.initializeScanner())
   }
 
   private async initializeScanner() {
     try {
-      // Check if we have reached genesis (have historical data)
       const genesisReached = await this.checkGenesisReached()
 
       if (!genesisReached) {
         this.logger.log('Genesis not reached. Starting backward scan...')
-        await this.scanBackwards()
+        await this.runBackwardScan()
       } else {
         this.logger.log('Genesis already reached. Skipping backward scan.')
-        this.isBackwardScanComplete = true
+        this.state.isBackwardScanComplete = true
       }
 
-      // Start processing existing unprocessed transactions in order
-      await this.processUnprocessedTransactions()
-      this.logger.log('Scanner initialization complete')
+      // await this.processUnprocessedTransactions()
+      // this.state.startupComplete = true
+      // this.logger.log('Scanner initialization complete')
     } catch (error) {
       this.logger.error('Failed to initialize scanner:', error)
     }
@@ -59,14 +64,7 @@ export class ScannerService {
 
   private async checkGenesisReached(): Promise<boolean> {
     // Get oldest transaction in our DB
-    const oldestInDb = await this.transactionModel
-      .findOne({})
-      .sort({ slot: 1, signature: 1 })
-      .exec()
-
-    if (!oldestInDb) {
-      return false
-    }
+    const oldestSignature = await this.getNewestTransactionLocal()
 
     try {
       // Check onchain: if no more signatures before our oldest, we reached genesis
@@ -74,14 +72,14 @@ export class ScannerService {
         this.programAddress,
         {
           limit: 1,
-          before: oldestInDb.signature,
-        }
+          before: oldestSignature,
+        },
       )
 
       const genesisReached = olderSignatures.length === 0
 
       if (genesisReached) {
-        this.logger.log(`🎉 Genesis reached! Oldest onchain transaction: ${oldestInDb.signature}`)
+        this.logger.log(`🎉 Genesis reached! Oldest onchain transaction: ${oldestSignature}`)
       }
 
       return genesisReached
@@ -91,99 +89,82 @@ export class ScannerService {
     }
   }
 
-  private async scanBackwards() {
-    this.logger.log('Starting backward scan to genesis...')
-    const BACKWARD_SCAN_LIMIT = 1000 // Limit for each batch of signatures to fetch
-    let beforeSignature: string | undefined
-    let hasMoreTransactions = true
+  private async runBackwardScan() {
+    this.logger.log('[BackwardScan] Starting backward scan to genesis...')
+    let beforeSignature = await this.getOldestTransactionLocal()
 
-    while (hasMoreTransactions && !this.isBackwardScanComplete) {
+    while (!this.state.isBackwardScanComplete) {
       try {
-        const signatures = await this.solanaService.getSignaturesForAddress(
-          this.programAddress,
-          {
-            limit: BACKWARD_SCAN_LIMIT,
-            before: beforeSignature,
-          }
-        )
+        const signatures = await this.solanaService.getSignaturesForAddress(this.programAddress, {
+          limit: SCAN_LIMITS.BACKWARD,
+          before: beforeSignature,
+        })
 
         if (signatures.length === 0) {
-          hasMoreTransactions = false
+          this.logger.log('[BackwardScan] Genesis reached during backward scan')
+          this.state.isBackwardScanComplete = true
           break
         }
 
         // Index signatures into database
-        await this.insertBatchTransactionEvent(signatures)
-
-        // Check if we've reached our genesis threshold
-        const genesisReached = await this.checkGenesisReached()
-        if (genesisReached) {
-          this.logger.log('Genesis reached during backward scan')
-          this.isBackwardScanComplete = true
-          break
-        }
+        // @dev Get before mean get new to old so we need to reserve to keep order real in blockchain
+        const reversedSignatures = signatures.reverse()
+        await this.insertBatchTransactionEvent(reversedSignatures)
 
         // Set the before signature for next batch (go further back in time)
-        beforeSignature = signatures[signatures.length - 1].signature
+        beforeSignature = reversedSignatures[0].signature
 
-        this.logger.debug(`Backward scan progress: processed ${signatures.length} signatures, last signature: ${beforeSignature}`)
+        this.logger.log(
+          `[BackwardScan] Processed ${signatures.length} signatures, last signature: ${beforeSignature}`,
+        )
       } catch (error) {
-        this.logger.error(`Error in backward scan:`, error)
-        // Continue with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        this.logger.error(`[BackwardScan] Error:`, error)
+        await sleep(this.config.retryDelayMs)
       }
+      await sleep(DELAYS.BETWEEN_BATCHES)
     }
 
-    this.isBackwardScanComplete = true
-    this.logger.log('Backward scan completed')
+    this.state.isBackwardScanComplete = true
+    this.logger.log('[BackwardScan] Backward scan completed')
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS) // Every 5 seconds
+  @Cron(CronExpression.EVERY_5_SECONDS)
   async scanForwards() {
-    if (!this.startupComplete) {
-      // Don't run forward scan until initialization is complete
-      return
-    }
-
     try {
-      this.logger.debug('Running forward scan for new transactions...')
+      this.logger.log('[ForwardScan] Running forward scan for new transactions...')
 
-      // Get the latest signature we have in our database
-      const latestTransaction = await this.transactionModel
-        .findOne({})
-        .sort({ block_time: -1 }) // Sort by block time instead of slot
-        .exec()
-
-      const untilSignature = latestTransaction?.signature
-
-      // Get new signatures (more recent than what we have)
-      const signatures = await this.solanaService.getSignaturesForAddress(
-        this.programAddress,
-        {
-          limit: this.config.batchSize,
-          until: untilSignature, // Get signatures newer than this
-        }
-      )
-
-      if (signatures.length > 0) {
-        this.logger.debug(`Forward scan: found ${signatures.length} new signatures`)
-
-        // Index new signatures
-        await this.insertBatchTransactionEvent(signatures)
-
-        // If backward scan is complete, process these new transactions immediately
-        if (this.isBackwardScanComplete) {
-          await this.processNewTransactions(signatures)
-        }
+      const untilSignature = await this.getNewestTransactionLocal()
+      // @notice ensure dont missing transaction at start time if forward and backward use diff page cursor
+      if (!untilSignature) {
+        this.logger.warn(
+          '[ForwardScan] No transactions found in local database, skipping forward scan.',
+        )
+        return
       }
 
+      const signatures = await this.solanaService.getSignaturesForAddress(this.programAddress, {
+        limit: SCAN_LIMITS.FORWARD,
+        until: untilSignature,
+      })
+
+      if (signatures.length > 0) {
+        this.logger.log(`[ForwardScan] Found ${signatures.length} new signatures`)
+
+        const reversedSignatures = signatures.reverse()
+        await this.insertBatchTransactionEvent(reversedSignatures)
+
+        // If backward scan is complete, process these new transactions immediately
+        // if (this.isBackwardScanComplete) {
+        //   await this.processNewTransactions(reversedSignatures)
+        // }
+      }
     } catch (error) {
-      this.logger.error('Error in forward scan:', error)
+      this.logger.error('[ForwardScan] Error:', error)
     }
   }
 
   private async insertBatchTransactionEvent(signatures: any[]) {
-    const transactionEvents = signatures.map(sig => ({
+    const transactionEvents = signatures.map((sig) => ({
       signature: sig.signature,
       slot: sig.slot,
       block_time: new Date(sig.blockTime * 1000),
@@ -197,7 +178,7 @@ export class ScannerService {
       await this.transactionModel.insertMany(transactionEvents, {
         ordered: false, // Continue inserting even if some fail due to duplicates
       })
-      this.logger.debug(`Indexed ${transactionEvents.length} transaction signatures`)
+      this.logger.log(`Indexed ${transactionEvents.length} transaction signatures`)
     } catch (error) {
       // Ignore duplicate key errors, log others
       if (error.code !== 11000) {
@@ -206,16 +187,21 @@ export class ScannerService {
     }
   }
 
+  @Cron(CronExpression.EVERY_5_SECONDS)
   private async processUnprocessedTransactions() {
-    if (this.isProcessingQueue) {
+    if (!this.state.isBackwardScanComplete) {
+      this.logger.log('Skipping unprocessed transactions processing, backward scan not complete')
+      return
+    }
+    if (this.state.isProcessingQueue) {
+      this.logger.log('Skipping unprocessed transactions processing, already processing queue')
       return
     }
 
-    this.isProcessingQueue = true
+    this.state.isProcessingQueue = true
     this.logger.log('Processing unprocessed transactions in slot order...')
 
     try {
-      // Process all unprocessed transactions in slot order
       const batchSize = this.config.batchSize
       let skip = 0
       let hasMore = true
@@ -223,7 +209,7 @@ export class ScannerService {
       while (hasMore) {
         const unprocessedTransactions = await this.transactionModel
           .find({ processed: false })
-          .sort({ slot: 1, signature: 1 }) // Ensure consistent ordering
+          .sort({ slot: 1, _id: 1 }) // Transaction inserted to db keep order real in blockchain so if same slot transaction have _id smallest will be oldest
           .skip(skip)
           .limit(batchSize)
           .exec()
@@ -241,37 +227,21 @@ export class ScannerService {
         skip += batchSize
         this.logger.debug(`Queued ${unprocessedTransactions.length} transactions for processing`)
 
-        // Small delay to prevent overwhelming the queue
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await sleep(DELAYS.QUEUE_PROCESSING)
       }
 
       this.logger.log('Finished queuing unprocessed transactions')
     } catch (error) {
       this.logger.error('Error processing unprocessed transactions:', error)
     } finally {
-      this.isProcessingQueue = false
-    }
-  }
-
-  private async processNewTransactions(signatures: any[]) {
-    // Sort by slot to maintain order
-    const sortedSignatures = signatures.sort((a, b) => a.slot - b.slot)
-
-    for (const sig of sortedSignatures) {
-      const transaction = await this.transactionModel
-        .findOne({ signature: sig.signature })
-        .exec()
-
-      if (transaction && !transaction.processed) {
-        await this.queueTransactionForProcessing(transaction)
-      }
+      this.state.isProcessingQueue = false
     }
   }
 
   private async queueTransactionForProcessing(transaction: TransactionEvent) {
     try {
       await this.transactionQueue.add(
-        'process-transaction',
+        JOB_TYPES.PROCESS_TRANSACTION,
         {
           signature: transaction.signature,
           slot: transaction.slot,
@@ -284,23 +254,40 @@ export class ScannerService {
             type: 'exponential',
             delay: this.config.retryDelayMs,
           },
-        }
+        },
       )
 
       // Mark as processed in our database
       await this.transactionModel.updateOne(
         { _id: transaction._id },
-        { processed: true, updated_at: new Date() }
+        { processed: true, updated_at: new Date() },
       )
-
     } catch (error) {
       this.logger.error(`Failed to queue transaction ${transaction.signature}:`, error)
     }
   }
 
-  // Manual trigger for scanning (used by controller/jobs)
+  private async getOldestTransactionLocal(): Promise<string | null> {
+    // @dev Fetches transactions in DESC order from RPC. InsertMany reverses the order to match blockchain chronology.
+    // For same-slot txs, smaller _id means older.
+    const transactionEvent = await this.transactionModel
+      .findOne({}, { signature: 1 })
+      .sort({ slot: 1, _id: 1 })
+      .lean()
+    return transactionEvent?.signature
+  }
+
+  private async getNewestTransactionLocal(): Promise<string | null> {
+    const transactionEvent = await this.transactionModel
+      .findOne({}, { signature: 1 })
+      .sort({ slot: -1, _id: -1 })
+      .lean()
+    return transactionEvent?.signature
+  }
+
+  // Manual trigger for scanning (used by controller/jobs). TODO: this function not yet implemented completely
   async startScanning() {
-    if (!this.startupComplete) {
+    if (!this.state.startupComplete) {
       this.logger.warn('Scanner not ready yet, initialization still in progress')
       return
     }
@@ -311,7 +298,7 @@ export class ScannerService {
     await this.scanForwards()
 
     // Process any unprocessed transactions
-    if (this.isBackwardScanComplete) {
+    if (this.state.isBackwardScanComplete) {
       await this.processUnprocessedTransactions()
     }
   }
@@ -329,19 +316,21 @@ export class ScannerService {
       .exec()
 
     return {
-      startupComplete: this.startupComplete,
-      backwardScanComplete: this.isBackwardScanComplete,
-      isProcessingQueue: this.isProcessingQueue,
+      startupComplete: this.state.startupComplete,
+      backwardScanComplete: this.state.isBackwardScanComplete,
+      isProcessingQueue: this.state.isProcessingQueue,
       genesisReached,
       totalTransactions,
       processedTransactions,
       unprocessedTransactions,
       queuedTransactions: await this.transactionQueue.getWaiting(),
-      oldestTransaction: oldestTransaction ? {
-        signature: oldestTransaction.signature,
-        slot: oldestTransaction.slot,
-        blockTime: oldestTransaction.block_time
-      } : null,
+      oldestTransaction: oldestTransaction
+        ? {
+            signature: oldestTransaction.signature,
+            slot: oldestTransaction.slot,
+            blockTime: oldestTransaction.block_time,
+          }
+        : null,
     }
   }
 
@@ -357,11 +346,13 @@ export class ScannerService {
 
     return {
       genesisReached,
-      oldestTransaction: oldestTransaction ? {
-        signature: oldestTransaction.signature,
-        slot: oldestTransaction.slot,
-        blockTime: oldestTransaction.block_time
-      } : null,
+      oldestTransaction: oldestTransaction
+        ? {
+            signature: oldestTransaction.signature,
+            slot: oldestTransaction.slot,
+            blockTime: oldestTransaction.block_time,
+          }
+        : null,
     }
   }
 }

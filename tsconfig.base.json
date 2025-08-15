@@ -3,7 +3,7 @@
     "strict": false,
     "allowJs": true,
     "sourceMap": true,
-    "target": "ES2021",
+    "target": "ES2022",
     "module": "CommonJS",
     "declaration": true,
     "incremental": false,
