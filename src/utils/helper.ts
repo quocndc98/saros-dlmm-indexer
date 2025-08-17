@@ -6,3 +6,11 @@ export function calculateDayDifference(date1: Date, date2: Date): number {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+export function splitAt(buffer: Buffer, index: number): [Buffer, Buffer] {
+  if (index < 0 || index > buffer.length) {
+    throw new RangeError('Index out of bounds');
+  }
+
+  return [buffer.subarray(0, index), buffer.subarray(index)];
+}

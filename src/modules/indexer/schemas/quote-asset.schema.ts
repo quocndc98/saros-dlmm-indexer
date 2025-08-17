@@ -1,22 +1,20 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
+import { QuoteAssetStatus, QuoteAssetType } from '../types/enums'
 
 @Schema({ timestamps: true })
 export class QuoteAsset extends Document {
   @Prop({ required: true, unique: true })
-  mint: string
+  declare id: string
 
   @Prop({ required: true })
-  symbol: string
+  tokenMintId: string
 
   @Prop({ required: true })
-  name: string
+  status: QuoteAssetStatus
 
   @Prop({ required: true })
-  decimals: number
-
-  @Prop({ required: true, default: 0 })
-  priceUsd: number
+  assetType: QuoteAssetType
 }
 
 export const QuoteAssetSchema = SchemaFactory.createForClass(QuoteAsset)

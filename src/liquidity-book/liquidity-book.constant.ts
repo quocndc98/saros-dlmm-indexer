@@ -1,39 +1,32 @@
-export const LB_INSTRUCTION_NAMES = {
-  accept_config_ownership: 'accept_config_ownership',
-  close_position: 'close_position',
-  create_position: 'create_position',
-  decrease_position: 'decrease_position',
-  increase_position: 'increase_position',
-  initialize_bin_array: 'initialize_bin_array',
-  initialize_bin_step_config: 'initialize_bin_step_config',
-  initialize_config: 'initialize_config',
-  initialize_pair: 'initialize_pair',
-  initialize_quote_asset_badge: 'initialize_quote_asset_badge',
-  set_hook: 'set_hook',
-  swap: 'swap',
-  transfer_config_ownership: 'transfer_config_ownership',
-  update_bin_step_config: 'update_bin_step_config',
-  update_pair_static_fee_parameters: 'update_pair_static_fee_parameters',
-  update_quote_asset_badge: 'update_quote_asset_badge',
-  withdraw_protocol_fees: 'withdraw_protocol_fees',
-}
+export const INSTRUCTION_NAMES = {
+  SWAP: 'swap',
+  CREATE_POSITION: 'create_position',
+  INCREASE_POSITION: 'increase_position',
+  DECREASE_POSITION: 'decrease_position',
+  CLOSE_POSITION: 'close_position',
+  COMPOSITION_FEES: 'composition_fees',
+  INITIALIZE_PAIR: 'initialize_pair',
+  INITIALIZE_BIN_STEP_CONFIG: 'initialize_bin_step_config',
+  INITIALIZE_QUOTE_ASSET_BADGE: 'initialize_quote_asset_badge',
+} as const
 
-export const LB_TYPES_NAMES = {
-  BinSwapEvent: 'BinSwapEvent',
-  PositionDecreaseEvent: 'PositionDecreaseEvent',
-}
+export const EVENT_NAMES = {
+  QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
+  QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
+} as const
+
+export const TYPE_NAMES = {
+  BIN: 'Bin',
+  BIN_ARRAY: 'BinArray',
+  BIN_SWAP: 'BinSwapEvent',
+  BIN_LIQUIDITY_DISTRIBUTION: 'BinLiquidityDistribution',
+  QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
+  QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent'
+} as const
 
 export const MDMA_HOOK_INSTRUCTION_NAMES = {
   initialize_config: 'initialize_config',
 }
-
-export const INSTRUCTION_AFFECTING_PAIR = [
-  LB_INSTRUCTION_NAMES.increase_position,
-  LB_INSTRUCTION_NAMES.decrease_position,
-  LB_INSTRUCTION_NAMES.close_position,
-  LB_INSTRUCTION_NAMES.swap,
-  LB_INSTRUCTION_NAMES.withdraw_protocol_fees, // change protocol fees
-]
 
 export const TRANSACTION_TYPE = {
   CREATE_POOL: 'CREATE_POOL',

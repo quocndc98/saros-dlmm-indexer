@@ -10,16 +10,7 @@ import {
   InitializeBinStepConfigArgs,
   StaticFeeParameters,
 } from '../../../liquidity-book/liquidity-book.type'
-
-export enum ConfigAvailability {
-  Open = 'OPEN',
-  Closed = 'CLOSED',
-}
-
-export enum BinStepConfigStatus {
-  Active = 'ACTIVE',
-  Inactive = 'INACTIVE',
-}
+import { ConfigAvailability, BinStepConfigStatus } from '../types/enums'
 
 interface InitializeBinStepConfigDecoded {
   bin_step: number

@@ -147,7 +147,8 @@ export class InitializePairProcessor extends BaseProcessor {
 
       // 2. Get bin step config - throw error if not found (matching Rust logic)
       this.logger.log(`Retrieving bin step config: ${decoded.bin_step_config}`)
-      const binStepConfig = await this.binStepConfigModel.findOne({ id: decoded.bin_step_config })
+      const binStepConfigs = await this.binStepConfigModel.find().lean()
+      const binStepConfig = await this.binStepConfigModel.findOne({ id: decoded.bin_step_config }).lean()
 
       if (!binStepConfig) {
         throw new Error(`Bin step config doesn't exist for pair ${decoded.pair}`)

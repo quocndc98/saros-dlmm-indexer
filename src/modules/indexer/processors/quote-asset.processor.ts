@@ -1,30 +1,24 @@
-import { Injectable, Inject } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Job } from 'bullmq'
-import { ConfigType } from '@nestjs/config'
-import { PublicKey } from '@solana/web3.js'
-import { getAccount, getMint } from '@solana/spl-token'
+import bs58 from 'bs58'
 import { BaseProcessor } from './base.processor'
 import { QuoteAsset } from '../schemas/quote-asset.schema'
-import { SolanaService } from '../services/solana.service'
-import { indexerConfig } from '../config/indexer.config'
+import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
+import { splitAt } from '../../../utils/helper'
+import { QuoteAssetBadgeInitializationEvent, QuoteAssetBadgeStatus, QuoteAssetBadgeUpdateEvent } from '../../../liquidity-book/liquidity-book.type'
+import { QuoteAssetType } from '../types/enums'
+import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 
-interface TokenMetadata {
-  symbol: string
-  name: string
-  decimals: number
-}
+// Constants from Rust
+const EVENT_IDENTIFIER = Buffer.from([228, 69, 165, 46, 81, 203, 154, 29])
+const QUOTE_ASSET_INIT_EVENT_DISCRIMINATOR = Buffer.from([202, 110, 93, 186, 165, 96, 200, 27])
+const QUOTE_ASSET_UPDATE_EVENT_DISCRIMINATOR = Buffer.from([102, 149, 171, 236, 123, 73, 205, 194])
 
 @Injectable()
 export class QuoteAssetProcessor extends BaseProcessor {
-  constructor(
-    @InjectModel(QuoteAsset.name)
-    private readonly quoteAssetModel: Model<QuoteAsset>,
-    private readonly solanaService: SolanaService,
-    @Inject(indexerConfig.KEY)
-    private readonly config: ConfigType<typeof indexerConfig>,
-  ) {
+  constructor(@InjectModel(QuoteAsset.name) private readonly quoteAssetModel: Model<QuoteAsset>) {
     super(QuoteAssetProcessor.name)
   }
 
@@ -32,123 +26,107 @@ export class QuoteAssetProcessor extends BaseProcessor {
     this.logJobStart(job)
 
     try {
-      const { mintAddress } = job.data
+      const { instruction } = job.data
 
-      if (!mintAddress) {
-        this.logger.warn('No mint address provided')
+      // Parse instruction data (matching Rust logic)
+      const decodedData = Buffer.from(bs58.decode(instruction.data))
+      const [identifier, data] = splitAt(decodedData, 8)
+
+      // Check if this is an event instruction
+      if (!identifier.equals(EVENT_IDENTIFIER)) {
+        this.logger.warn('Not an event instruction')
         return
       }
 
-      const mint = new PublicKey(mintAddress)
+      const [discriminator, eventData] = splitAt(data, 8)
 
-      // Check if quote asset already exists
-      const existingAsset = await this.quoteAssetModel.findOne({ mint: mint.toBase58() })
-      if (existingAsset) {
-        this.logger.debug(`Quote asset ${mint.toBase58()} already exists`)
-        return
+      if (discriminator.equals(QUOTE_ASSET_INIT_EVENT_DISCRIMINATOR)) {
+        const decoded = LiquidityBookLibrary.decodeType<QuoteAssetBadgeInitializationEvent>(
+          TYPE_NAMES.QUOTE_ASSET_BADGE_INITIALIZATION_EVENT,
+          eventData,
+        )
+        if (decoded) {
+          await this.processInitEvent(decoded)
+        }
+      } else if (discriminator.equals(QUOTE_ASSET_UPDATE_EVENT_DISCRIMINATOR)) {
+        const decoded = LiquidityBookLibrary.decodeType<QuoteAssetBadgeUpdateEvent>(
+          TYPE_NAMES.QUOTE_ASSET_BADGE_UPDATE_EVENT,
+          eventData,
+        )
+        if (decoded) {
+          await this.processUpdateEvent(decoded)
+        }
       }
 
-      // Get token metadata
-      const tokenMetadata = await this.getTokenMetadata(mint)
-      if (!tokenMetadata) {
-        this.logger.warn(`Failed to get metadata for token ${mint.toBase58()}`)
-        return
-      }
-
-      // Get USD price from Gecko Terminal
-      const priceUsd = await this.getTokenPrice(mint.toBase58())
-
-      // Save quote asset
-      const quoteAsset = new this.quoteAssetModel({
-        mint: mint.toBase58(),
-        symbol: tokenMetadata.symbol,
-        name: tokenMetadata.name,
-        decimals: tokenMetadata.decimals,
-        price_usd: priceUsd || 0,
-      })
-
-      await quoteAsset.save()
-
-      this.logger.log(`Added quote asset: ${tokenMetadata.symbol} (${mint.toBase58()})`)
       this.logJobComplete(job)
     } catch (error) {
-      await this.handleError(error, `processing quote asset`)
+      await this.handleError(error, `processing quote asset events`)
     }
   }
 
-  private async getTokenMetadata(mint: PublicKey): Promise<TokenMetadata | null> {
+  // NOT TEST YET
+  private async processInitEvent(eventData: QuoteAssetBadgeInitializationEvent): Promise<void> {
     try {
-      const connection = this.solanaService.getConnection()
+      // Check if quote asset already exists (matching Rust logic)
+      const existing = await this.quoteAssetModel.findOne({
+        id: eventData.quote_asset_badge.toBase58(),
+      })
 
-      // Get mint info
-      const mintInfo = await getMint(connection, mint)
-
-      // For known tokens, use hardcoded metadata
-      const knownTokens = this.getKnownTokens()
-      const known = knownTokens[mint.toBase58()]
-      if (known) {
-        return {
-          symbol: known.symbol,
-          name: known.name,
-          decimals: mintInfo.decimals,
-        }
+      if (existing) {
+        this.logger.log(
+          `Quote asset ${eventData.quote_asset_badge.toBase58()} already exists, skipping...`,
+        )
+        return
       }
 
-      // Try to get metadata from token metadata program
-      // This is a simplified version - in production you'd want more robust metadata fetching
-      return {
-        symbol: mint.toBase58().slice(0, 8).toUpperCase(),
-        name: `Token ${mint.toBase58().slice(0, 8)}`,
-        decimals: mintInfo.decimals,
+      // Create new quote asset (matching Rust fields exactly)
+      const quoteAssetData = {
+        id: eventData.quote_asset_badge.toBase58(),
+        tokenMintId: eventData.token_mint.toBase58(),
+        status: QuoteAssetBadgeStatus.Enabled,
+        assetType: QuoteAssetType.Other, // TODO: Update this logic
       }
+
+      await this.quoteAssetModel.create(quoteAssetData)
+      this.logger.log(`Created quote asset: ${eventData.quote_asset_badge.toBase58()}`)
     } catch (error) {
-      this.logger.error(`Error getting token metadata for ${mint.toBase58()}:`, error)
-      return null
+      this.logger.error(`Error processing init event:`, error)
+      throw error
     }
   }
 
-  private async getTokenPrice(mintAddress: string): Promise<number | null> {
+  private async processUpdateEvent(eventData: QuoteAssetBadgeUpdateEvent): Promise<void> {
     try {
-      // Use Gecko Terminal API to get token price
-      const response = await fetch(
-        `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${mintAddress}`,
+      // Find existing quote asset (matching Rust logic)
+      const existing = await this.quoteAssetModel.findOne({
+        id: eventData.quote_asset_badge.toBase58(),
+      })
+
+      if (!existing) {
+        throw new Error(
+          `Error indexing quote asset update, non existent quote asset ${eventData.quote_asset_badge.toBase58()}`,
+        )
+      }
+
+      // Update status (matching Rust enum conversion)
+      const statusValue = eventData.status === QuoteAssetBadgeStatus.Disabled
+        ? QuoteAssetBadgeStatus.Disabled
+        : QuoteAssetBadgeStatus.Enabled
+
+      await this.quoteAssetModel.updateOne(
+        { id: eventData.quote_asset_badge.toBase58() },
         {
-          headers: {
-            'Accept': 'application/json',
-            'X-API-KEY': this.config.geckoTerminalApiKey,
-          },
-        }
+          status: statusValue,
+          updatedAt: new Date(),
+        },
       )
 
-      if (!response.ok) {
-        this.logger.warn(`Failed to get price for ${mintAddress}: ${response.status}`)
-        return null
-      }
-
-      const data = await response.json()
-      const priceUsd = data?.data?.attributes?.price_usd
-
-      return priceUsd ? parseFloat(priceUsd) : null
+      this.logger.log(
+        `Updated quote asset ${eventData.quote_asset_badge.toBase58()} status to ${statusValue}`,
+      )
     } catch (error) {
-      this.logger.error(`Error getting token price for ${mintAddress}:`, error)
-      return null
-    }
-  }
-
-  private getKnownTokens(): Record<string, { symbol: string; name: string }> {
-    return {
-      [this.config.solanaWnativeAddress]: {
-        symbol: 'SOL',
-        name: 'Wrapped SOL',
-      },
-      [this.config.solanaUsdcAddress]: {
-        symbol: 'USDC',
-        name: 'USD Coin',
-      },
-      [this.config.solanaUsdtAddress]: {
-        symbol: 'USDT',
-        name: 'Tether USD',
-      },
+      this.logger.error(`Error processing update event:`, error)
+      throw error
     }
   }
 }

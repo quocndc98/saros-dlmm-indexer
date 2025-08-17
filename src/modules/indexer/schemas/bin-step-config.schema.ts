@@ -1,9 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
-import {
-  BinStepConfigStatus,
-  ConfigAvailability,
-} from '../processors/initialize-bin-step-config.processor'
+import { BinStepConfigStatus, ConfigAvailability } from '../types/enums'
 
 export type BinStepConfigDocument = BinStepConfig & Document
 

@@ -38,11 +38,11 @@ export class LiquidityBookLibrary {
     }
   }
 
-  static decodeType<T>(name: string, data: string) {
+  static decodeType<T>(name: string, data: Buffer) {
     const type = LiquidityBookIdl.types.find((type) => type.name === name)
     if (!type) return null
 
-    return coder.types.decode<T>(type.name, Buffer.from(bs58.decode(data)))
+    return coder.types.decode<T>(type.name, data)
   }
 
 
@@ -79,4 +79,18 @@ export class LiquidityBookLibrary {
     )
     return idlIx ? idlIx.name : null
   }
+
+  // @notice data should be full event data including event identifier
+  static getEventName(data: string): string | null {
+    const dataBuffer = Buffer.from(bs58.decode(data))
+    // Skip event identifier (first 8 bytes), get discriminator from next 8 bytes
+    const discriminator = dataBuffer.subarray(8, 16)
+    const event = LiquidityBookIdl.events.find((ix) =>
+      Buffer.from(ix.discriminator).equals(discriminator),
+    )
+    if (!event) return null
+    return event.name
+  }
+
+
 }

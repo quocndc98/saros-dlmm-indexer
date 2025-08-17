@@ -23,17 +23,6 @@ export const JOB_TYPES = {
   PROCESS_COMPOSITION_FEES: 'process-composition-fees',
   PROCESS_INITIALIZE_PAIR: 'process-initialize-pair',
   PROCESS_INITIALIZE_BIN_STEP_CONFIG: 'process-initialize-bin-step-config',
+  PROCESS_QUOTE_ASSET: 'process-quote-asset',
   PROCESS_DLQ: 'process-dlq',
-  UPDATE_QUOTE_ASSET: 'update-quote-asset',
-} as const
-
-export const INSTRUCTION_NAMES = {
-  SWAP: 'swap',
-  CREATE_POSITION: 'create_position',
-  INCREASE_POSITION: 'increase_position',
-  DECREASE_POSITION: 'decrease_position',
-  CLOSE_POSITION: 'close_position',
-  COMPOSITION_FEES: 'composition_fees',
-  INITIALIZE_PAIR: 'initialize_pair',
-  INITIALIZE_BIN_STEP_CONFIG: 'initialize_bin_step_config',
 } as const

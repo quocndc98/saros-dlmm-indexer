@@ -94,3 +94,19 @@ export type InitializeBinStepConfigArgs = {
 }
 
 export type ConfigAvailability = { Open?: {} | null; Closed?: {} | null }
+
+export type QuoteAssetBadgeInitializationEvent = {
+  liquidity_book_config: PublicKey
+  quote_asset_badge: PublicKey
+  token_mint: PublicKey
+}
+
+export type QuoteAssetBadgeUpdateEvent = {
+  quote_asset_badge: PublicKey
+  status: QuoteAssetBadgeStatus
+}
+
+export enum QuoteAssetBadgeStatus {
+  Disabled = 'DISABLED',
+  Enabled = 'ENABLED',
+}
