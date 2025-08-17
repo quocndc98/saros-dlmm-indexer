@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
-@Schema({ collection: 'transaction_events', timestamps: true })
+@Schema({ timestamps: true })
 export class TransactionEvent extends Document {
   @Prop({ required: true })
   signature: string
@@ -10,22 +10,25 @@ export class TransactionEvent extends Document {
   slot: number
 
   @Prop({ required: true })
-  block_time: Date
+  blockTime: Date
 
   @Prop({ required: true })
-  is_successful: boolean
+  isSuccessful: boolean
 
   @Prop({ type: Object })
-  error_message?: any
+  errorMessage?: any
 
   @Prop({ required: true })
   processed: boolean
 
-  @Prop({ default: Date.now })
-  created_at: Date
+  @Prop({ default: false })
+  queued: boolean
 
   @Prop({ default: Date.now })
-  updated_at: Date
+  createdAt: Date
+
+  @Prop({ default: Date.now })
+  updatedAt: Date
 }
 
 export const TransactionEventSchema = SchemaFactory.createForClass(TransactionEvent)

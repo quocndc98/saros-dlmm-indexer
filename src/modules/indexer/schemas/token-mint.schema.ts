@@ -1,25 +1,24 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
+export type TokenMintDocument = TokenMint & Document
+
 @Schema({ timestamps: true })
-export class Position extends Document {
+export class TokenMint {
   @Prop({ required: true, unique: true })
-  positionMint: string
+  id: string
 
   @Prop({ required: true })
-  pair: string
+  supply: string
 
   @Prop({ required: true })
-  owner: string
+  decimals: number
 
   @Prop({ required: true })
-  lowerBinId: number
+  name: string
 
   @Prop({ required: true })
-  upperBinId: number
-
-  @Prop({ type: [String], required: true })
-  liquidityShares: string[]
+  symbol: string
 }
 
-export const PositionSchema = SchemaFactory.createForClass(Position)
+export const TokenMintSchema = SchemaFactory.createForClass(TokenMint)

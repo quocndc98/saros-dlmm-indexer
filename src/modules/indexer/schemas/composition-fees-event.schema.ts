@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
-@Schema({ collection: 'composition_fees_events', timestamps: true })
+@Schema({ timestamps: true })
 export class CompositionFeesEvent extends Document {
   @Prop({ required: true })
   signature: string
@@ -10,7 +10,7 @@ export class CompositionFeesEvent extends Document {
   slot: number
 
   @Prop({ required: true })
-  block_time: Date
+  blockTime: Date
 
   @Prop({ required: true })
   pair: string
@@ -19,25 +19,19 @@ export class CompositionFeesEvent extends Document {
   user: string
 
   @Prop({ required: true })
-  total_fees_x: string
+  totalFeesX: string
 
   @Prop({ required: true })
-  total_fees_y: string
+  totalFeesY: string
 
   @Prop({ type: [Number], required: true })
-  bin_ids: number[]
+  binIds: number[]
 
   @Prop({ type: [String], required: true })
-  fees_x: string[]
+  feesX: string[]
 
   @Prop({ type: [String], required: true })
-  fees_y: string[]
-
-  @Prop({ default: Date.now })
-  created_at: Date
-
-  @Prop({ default: Date.now })
-  updated_at: Date
+  feesY: string[]
 }
 
 export const CompositionFeesEventSchema = SchemaFactory.createForClass(CompositionFeesEvent)

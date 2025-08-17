@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
-@Schema({ collection: 'dlq_events', timestamps: true })
+@Schema({ timestamps: true })
 export class DlqEvent extends Document {
   @Prop({ required: true })
   signature: string
@@ -10,25 +10,19 @@ export class DlqEvent extends Document {
   slot: number
 
   @Prop({ required: true })
-  block_time: Date
+  blockTime: Date
 
   @Prop({ required: true })
-  instruction_index: number
+  instructionIndex: number
 
   @Prop({ required: true })
-  instruction_name: string
+  instructionName: string
 
   @Prop({ type: Object })
-  instruction_data: any
+  instructionData: any
 
   @Prop({ type: Object })
-  error_message: any
-
-  @Prop({ default: Date.now })
-  created_at: Date
-
-  @Prop({ default: Date.now })
-  updated_at: Date
+  errorMessage: any
 }
 
 export const DlqEventSchema = SchemaFactory.createForClass(DlqEvent)

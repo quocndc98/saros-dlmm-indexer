@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
-@Schema({ collection: 'quote_assets', timestamps: true })
+@Schema({ timestamps: true })
 export class QuoteAsset extends Document {
   @Prop({ required: true, unique: true })
   mint: string
@@ -16,13 +16,7 @@ export class QuoteAsset extends Document {
   decimals: number
 
   @Prop({ required: true, default: 0 })
-  price_usd: number
-
-  @Prop({ default: Date.now })
-  created_at: Date
-
-  @Prop({ default: Date.now })
-  updated_at: Date
+  priceUsd: number
 }
 
 export const QuoteAssetSchema = SchemaFactory.createForClass(QuoteAsset)
