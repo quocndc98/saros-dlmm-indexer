@@ -7,6 +7,8 @@ export const QUEUE_NAME = {
   COMPOSITION_FEES_PROCESSOR: 'composition-fees-processor',
   DLQ_PROCESSOR: 'dlq-processor',
   QUOTE_ASSET_PROCESSOR: 'quote-asset-processor',
+  INITIALIZE_PAIR_PROCESSOR: 'initialize-pair-processor',
+  INITIALIZE_BIN_STEP_CONFIG_PROCESSOR: 'initialize-bin-step-config-processor',
 }
 
 export const JOB_TYPES = {
@@ -19,15 +21,19 @@ export const JOB_TYPES = {
   PROCESS_POSITION_DECREASE: 'process-position-decrease',
   PROCESS_POSITION_CLOSE: 'process-position-close',
   PROCESS_COMPOSITION_FEES: 'process-composition-fees',
+  PROCESS_INITIALIZE_PAIR: 'process-initialize-pair',
+  PROCESS_INITIALIZE_BIN_STEP_CONFIG: 'process-initialize-bin-step-config',
   PROCESS_DLQ: 'process-dlq',
   UPDATE_QUOTE_ASSET: 'update-quote-asset',
 } as const
 
 export const INSTRUCTION_NAMES = {
   SWAP: 'swap',
-  CREATE_POSITION: 'createPosition',
-  INCREASE_POSITION: 'increasePosition',
-  DECREASE_POSITION: 'decreasePosition',
-  CLOSE_POSITION: 'closePosition',
-  COMPOSITION_FEES: 'compositionFees',
+  CREATE_POSITION: 'create_position',
+  INCREASE_POSITION: 'increase_position',
+  DECREASE_POSITION: 'decrease_position',
+  CLOSE_POSITION: 'close_position',
+  COMPOSITION_FEES: 'composition_fees',
+  INITIALIZE_PAIR: 'initialize_pair',
+  INITIALIZE_BIN_STEP_CONFIG: 'initialize_bin_step_config',
 } as const

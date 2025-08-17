@@ -8,6 +8,7 @@ import { Position } from '../schemas/position.schema'
 import { PositionUpdateEvent } from '../schemas/position-update-event.schema'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { SolanaService } from '../services/solana.service'
+import { INSTRUCTION_NAMES } from '../constants/indexer.constants'
 
 @Injectable()
 export class PositionProcessor extends BaseProcessor {
@@ -18,7 +19,7 @@ export class PositionProcessor extends BaseProcessor {
     private readonly positionUpdateEventModel: Model<PositionUpdateEvent>,
     private readonly solanaService: SolanaService,
   ) {
-    super('PositionProcessor')
+    super(PositionProcessor.name)
   }
 
   async process(job: Job): Promise<void> {
@@ -29,16 +30,16 @@ export class PositionProcessor extends BaseProcessor {
       const { signature, slot, blockTime, instructionName, instructionData, accounts } = instruction
 
       switch (instructionName) {
-        case 'createPosition':
+        case INSTRUCTION_NAMES.CREATE_POSITION :
           await this.processCreatePosition(signature, slot, blockTime, instructionData, accounts)
           break
-        case 'increasePosition':
+        case INSTRUCTION_NAMES.INCREASE_POSITION:
           await this.processIncreasePosition(signature, slot, blockTime, instructionData, accounts)
           break
-        case 'decreasePosition':
+        case INSTRUCTION_NAMES.DECREASE_POSITION:
           await this.processDecreasePosition(signature, slot, blockTime, instructionData, accounts)
           break
-        case 'closePosition':
+        case INSTRUCTION_NAMES.CLOSE_POSITION:
           await this.processClosePosition(signature, slot, blockTime, instructionData, accounts)
           break
         default:

@@ -8,6 +8,8 @@ import { SolanaService } from '../services/solana.service'
 import { TransactionParserService } from '../services/transaction-parser.service'
 import { TransactionEvent } from '../schemas/transaction-event.schema'
 import { QUEUE_NAME, JOB_TYPES, INSTRUCTION_NAMES } from '../../queue/queue.constant'
+import { ParsedInstructionMessage, ParsedTransactionMessage } from '../types/indexer.types'
+import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 
 @Injectable()
 export class TransactionProcessor extends BaseProcessor {
@@ -16,12 +18,17 @@ export class TransactionProcessor extends BaseProcessor {
     private readonly transactionParserService: TransactionParserService,
     @InjectQueue(QUEUE_NAME.SWAP_PROCESSOR) private readonly swapQueue: Queue,
     @InjectQueue(QUEUE_NAME.POSITION_PROCESSOR) private readonly positionQueue: Queue,
-    @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR) private readonly compositionFeesQueue: Queue,
+    @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR)
+    private readonly compositionFeesQueue: Queue,
+    @InjectQueue(QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR) private readonly initializePairQueue: Queue,
+    @InjectQueue(QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR)
+    private readonly initializeBinStepConfigQueue: Queue,
     @InjectQueue(QUEUE_NAME.DLQ_PROCESSOR) private readonly dlqQueue: Queue,
     @InjectModel(TransactionEvent.name)
     private readonly transactionEventModel: Model<TransactionEvent>,
   ) {
-    super('TransactionProcessor')
+    super(TransactionProcessor.name)
+    this.process({} as any) // FAST TEST HERE
   }
 
   async process(job: Job): Promise<void> {
@@ -29,6 +36,11 @@ export class TransactionProcessor extends BaseProcessor {
 
     try {
       const { signature } = job.data
+      // const signature =
+      // '4kTqfwmeVAgpSByFCrZGXt6CxezsE4dPS6SBqM3s7o4jn2RSA1K8ejnKgv537Wy1GJ3jDFsKzWFTw4z8HBk8RTkK' // init bin step config
+      // const signature = '22xADbyM1btYpairSV8qMDr2LKT9MvGmiRtTjunrc5x5fc45AspajtsL6DwZr2dLvAsdhYNo9PhZRRp9vnnw6ntUrJCo' // init pair
+      // const signature = '5Kna4KKq7KK465mbTaQrngr3zvaXEohzt8edDbyfKTvfSDDgdfPv7pSYofRfp1FvXrVDMpLziwFqKJgaGpB9yyLL' // init config
+      // const signature = '3fMXMP7fcCG23vLeNCPZrRVNA6nM7GKbC15TGYis5wPPLcwCcUGrbYFZhPfERgw9XuwoJWgjG5gmdng5DxHTTZvR' // init quote asset badge
 
       // Get the parsed transaction from Solana
       const transaction = await this.solanaService.getParsedTransaction(signature)
@@ -37,15 +49,14 @@ export class TransactionProcessor extends BaseProcessor {
         return
       }
 
-      // Parse the transaction
-      const parsedTransaction = this.transactionParserService.parseTransaction(signature, transaction)
-      if (!parsedTransaction) {
-        this.logger.warn(`Failed to parse transaction ${signature}`)
-        return
-      }
+      const message = transaction.transaction.message
+      const meta = transaction.meta
+      const slot = transaction.slot
+      const blockTime = transaction.blockTime || 0
 
       // Extract liquidity book instructions
-      const liquidityBookInstructions = this.transactionParserService.extractLiquidityBookInstructions(parsedTransaction)
+      const liquidityBookInstructions =
+        this.transactionParserService.extractLiquidityBookInstructions(transaction)
 
       if (liquidityBookInstructions.length === 0) {
         this.logger.debug(`No liquidity book instructions found in transaction ${signature}`)
@@ -62,8 +73,8 @@ export class TransactionProcessor extends BaseProcessor {
         { signature },
         {
           processed: true,
-          updated_at: new Date(),
-        }
+          updatedAt: new Date(),
+        },
       )
 
       this.logJobComplete(job)
@@ -72,13 +83,15 @@ export class TransactionProcessor extends BaseProcessor {
     }
   }
 
-  private async processInstruction(instruction: any): Promise<void> {
+  private async processInstruction(instruction: ParsedInstructionMessage): Promise<void> {
     try {
       let queueName: string
       let jobType: string
 
+      const instructionName = LiquidityBookLibrary.getInstructionName(instruction.instruction.data)
+
       // Determine which processor to use based on instruction name
-      switch (instruction.instructionName) {
+      switch (instructionName) {
         case INSTRUCTION_NAMES.SWAP:
           queueName = QUEUE_NAME.SWAP_PROCESSOR
           jobType = JOB_TYPES.PROCESS_SWAP
@@ -103,9 +116,17 @@ export class TransactionProcessor extends BaseProcessor {
           queueName = QUEUE_NAME.COMPOSITION_FEES_PROCESSOR
           jobType = JOB_TYPES.PROCESS_COMPOSITION_FEES
           break
+        case INSTRUCTION_NAMES.INITIALIZE_PAIR:
+          queueName = QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR
+          jobType = JOB_TYPES.PROCESS_INITIALIZE_PAIR
+          break
+        case INSTRUCTION_NAMES.INITIALIZE_BIN_STEP_CONFIG:
+          queueName = QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR
+          jobType = JOB_TYPES.PROCESS_INITIALIZE_BIN_STEP_CONFIG
+          break
         default:
           // Skip unknown instructions or add to DLQ
-          this.logger.debug(`Unknown instruction: ${instruction.instructionName}`)
+          this.logger.debug(`Unknown instruction: ${instructionName}`)
           return
       }
 
@@ -121,24 +142,29 @@ export class TransactionProcessor extends BaseProcessor {
         case QUEUE_NAME.COMPOSITION_FEES_PROCESSOR:
           targetQueue = this.compositionFeesQueue
           break
+        case QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR:
+          targetQueue = this.initializePairQueue
+          break
+        case QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR:
+          targetQueue = this.initializeBinStepConfigQueue
+          break
         default:
           this.logger.warn(`Unknown queue: ${queueName}`)
           return
       }
 
-      await targetQueue.add(jobType, instruction)
+      // Create job data with raw instruction data (similar to Rust approach)
+      const jobData = instruction
 
+      await targetQueue.add(jobType, jobData)
     } catch (error) {
-      this.logger.error(`Error processing instruction ${instruction.instructionName}:`, error)
+      this.logger.error(`Error processing transaction ${instruction.transaction_signature}:`, error)
 
       // Add to DLQ for failed instructions
-      await this.dlqQueue.add(
-        JOB_TYPES.PROCESS_DLQ,
-        {
-          ...instruction,
-          errorMessage: error.message,
-        }
-      )
+      await this.dlqQueue.add(JOB_TYPES.PROCESS_DLQ, {
+        ...instruction,
+        errorMessage: error.message,
+      })
     }
   }
 }

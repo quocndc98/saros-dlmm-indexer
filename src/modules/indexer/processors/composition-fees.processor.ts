@@ -13,7 +13,7 @@ export class CompositionFeesProcessor extends BaseProcessor {
     @InjectModel(CompositionFeesEvent.name)
     private readonly compositionFeesEventModel: Model<CompositionFeesEvent>,
   ) {
-    super('CompositionFeesProcessor')
+    super(CompositionFeesProcessor.name)
   }
 
   async process(job: Job): Promise<void> {

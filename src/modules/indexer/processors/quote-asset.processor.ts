@@ -25,7 +25,7 @@ export class QuoteAssetProcessor extends BaseProcessor {
     @Inject(indexerConfig.KEY)
     private readonly config: ConfigType<typeof indexerConfig>,
   ) {
-    super('QuoteAssetProcessor')
+    super(QuoteAssetProcessor.name)
   }
 
   async process(job: Job): Promise<void> {

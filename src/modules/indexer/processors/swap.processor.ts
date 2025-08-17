@@ -17,7 +17,7 @@ export class SwapProcessor extends BaseProcessor {
     @InjectModel(BinSwapEvent.name)
     private readonly binSwapEventModel: Model<BinSwapEvent>,
   ) {
-    super('SwapProcessor')
+    super(SwapProcessor.name)
   }
 
   async process(job: Job): Promise<void> {

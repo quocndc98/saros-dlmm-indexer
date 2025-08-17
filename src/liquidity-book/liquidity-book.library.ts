@@ -70,4 +70,13 @@ export class LiquidityBookLibrary {
   static getIdlInstructionByName(name: string): IdlInstruction | null {
     return LiquidityBookIdl.instructions.find((ix) => ix.name === name)
   }
+
+  static getInstructionName(data: string): string | null {
+    const dataBuffer = Buffer.from(bs58.decode(data))
+    const discriminator = dataBuffer.subarray(0, 8)
+    const idlIx = LiquidityBookIdl.instructions.find((ix) =>
+      Buffer.from(ix.discriminator).equals(discriminator),
+    )
+    return idlIx ? idlIx.name : null
+  }
 }

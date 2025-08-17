@@ -86,3 +86,11 @@ export type PositionDecreaseEvent = {
   amounts_y: BN[]
   liquidity_burned: BN[]
 }
+
+export type InitializeBinStepConfigArgs = {
+  bin_step: number
+  availability: ConfigAvailability
+  fee_parameters: StaticFeeParameters
+}
+
+export type ConfigAvailability = { Open?: {} | null; Closed?: {} | null }

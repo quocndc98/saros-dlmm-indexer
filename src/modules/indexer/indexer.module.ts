@@ -16,6 +16,9 @@ import { PositionUpdateEvent, PositionUpdateEventSchema } from './schemas/positi
 import { CompositionFeesEvent, CompositionFeesEventSchema } from './schemas/composition-fees-event.schema'
 import { DlqEvent, DlqEventSchema } from './schemas/dlq-event.schema'
 import { QuoteAsset, QuoteAssetSchema } from './schemas/quote-asset.schema'
+import { Pair, PairSchema } from './schemas/pair.schema'
+import { TokenMint, TokenMintSchema } from './schemas/token-mint.schema'
+import { BinStepConfig, BinStepConfigSchema } from './schemas/bin-step-config.schema'
 
 // Services
 import { SolanaService } from './services/solana.service'
@@ -29,6 +32,8 @@ import { TransactionProcessor } from './processors/transaction.processor'
 import { SwapProcessor } from './processors/swap.processor'
 import { PositionProcessor } from './processors/position.processor'
 import { CompositionFeesProcessor } from './processors/composition-fees.processor'
+import { InitializePairProcessor } from './processors/initialize-pair.processor'
+import { InitializeBinStepConfigProcessor } from './processors/initialize-bin-step-config.processor'
 import { DlqProcessor } from './processors/dlq.processor'
 import { QuoteAssetProcessor } from './processors/quote-asset.processor'
 
@@ -56,6 +61,9 @@ import { IndexerController } from './controllers/indexer.controller'
       { name: CompositionFeesEvent.name, schema: CompositionFeesEventSchema },
       { name: DlqEvent.name, schema: DlqEventSchema },
       { name: QuoteAsset.name, schema: QuoteAssetSchema },
+      { name: Pair.name, schema: PairSchema },
+      { name: TokenMint.name, schema: TokenMintSchema },
+      { name: BinStepConfig.name, schema: BinStepConfigSchema },
     ]),
   ],
   controllers: [IndexerController],
@@ -72,6 +80,8 @@ import { IndexerController } from './controllers/indexer.controller'
     SwapProcessor,
     PositionProcessor,
     CompositionFeesProcessor,
+    InitializePairProcessor,
+    InitializeBinStepConfigProcessor,
     DlqProcessor,
     QuoteAssetProcessor,
 

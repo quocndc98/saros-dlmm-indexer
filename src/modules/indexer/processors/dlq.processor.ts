@@ -11,7 +11,7 @@ export class DlqProcessor extends BaseProcessor {
     @InjectModel(DlqEvent.name)
     private readonly dlqEventModel: Model<DlqEvent>,
   ) {
-    super('DlqProcessor')
+    super(DlqProcessor.name)
   }
 
   async process(job: Job): Promise<void> {

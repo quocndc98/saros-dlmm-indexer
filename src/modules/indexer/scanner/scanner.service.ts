@@ -3,7 +3,7 @@ import { ConfigType } from '@nestjs/config'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Cron, CronExpression } from '@nestjs/schedule'
-import { PublicKey } from '@solana/web3.js'
+import { ConfirmedSignatureInfo, PublicKey } from '@solana/web3.js'
 import { indexerConfig } from '../config/indexer.config'
 import { TransactionEvent } from '../schemas/transaction-event.schema'
 import { SolanaService } from '../services/solana.service'
@@ -39,7 +39,9 @@ export class ScannerService {
   async onModuleInit() {
     this.logger.log('Initializing Scanner Service...')
     // Wait a bit before starting to ensure other services are ready
-    sleep(DELAYS.INITIALIZATION).then(() => this.initializeScanner())
+    // TODO: uncomment for production
+    this.state.isBackwardScanComplete = true
+    // sleep(DELAYS.INITIALIZATION).then(() => this.initializeScanner())
   }
 
   private async initializeScanner() {
@@ -64,7 +66,11 @@ export class ScannerService {
 
   private async checkGenesisReached(): Promise<boolean> {
     // Get oldest transaction in our DB
-    const oldestSignature = await this.getNewestTransactionLocal()
+    const oldestSignature = await this.getOldestTransactionLocal()
+
+    if (!oldestSignature) {
+      return false // No transactions yet
+    }
 
     try {
       // Check onchain: if no more signatures before our oldest, we reached genesis
@@ -128,7 +134,7 @@ export class ScannerService {
     this.logger.log('[BackwardScan] Backward scan completed')
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  // @Cron(CronExpression.EVERY_5_SECONDS) // TODO: uncomment for production
   async scanForwards() {
     try {
       this.logger.log('[ForwardScan] Running forward scan for new transactions...')
@@ -163,7 +169,7 @@ export class ScannerService {
     }
   }
 
-  private async insertBatchTransactionEvent(signatures: any[]) {
+  private async insertBatchTransactionEvent(signatures: ConfirmedSignatureInfo[]) {
     const transactionEvents = signatures.map((sig) => ({
       signature: sig.signature,
       slot: sig.slot,
@@ -171,9 +177,11 @@ export class ScannerService {
       is_successful: !sig.err,
       error_message: sig.err,
       processed: false,
+      queued: false, // Initialize as not queued
     }))
 
     // Bulk insert, ignore duplicates
+    // TODO: filter out failed transaction
     try {
       await this.transactionModel.insertMany(transactionEvents, {
         ordered: false, // Continue inserting even if some fail due to duplicates
@@ -187,7 +195,7 @@ export class ScannerService {
     }
   }
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  // @Cron(CronExpression.EVERY_5_SECONDS)
   private async processUnprocessedTransactions() {
     if (!this.state.isBackwardScanComplete) {
       this.logger.log('Skipping unprocessed transactions processing, backward scan not complete')
@@ -203,16 +211,18 @@ export class ScannerService {
 
     try {
       const batchSize = this.config.batchSize
-      let skip = 0
       let hasMore = true
 
       while (hasMore) {
+        // TODO: consider to use cursor-based pagination instead of skip
         const unprocessedTransactions = await this.transactionModel
-          .find({ processed: false })
+          .find({
+            processed: false,
+            queued: { $ne: true } // Only get transactions not yet queued
+          })
           .sort({ slot: 1, _id: 1 }) // Transaction inserted to db keep order real in blockchain so if same slot transaction have _id smallest will be oldest
-          .skip(skip)
-          .limit(batchSize)
-          .exec()
+          .limit(batchSize) // Remove skip, use cursor-based approach
+          .lean()
 
         if (unprocessedTransactions.length === 0) {
           hasMore = false
@@ -220,11 +230,8 @@ export class ScannerService {
         }
 
         // Queue transactions for processing
-        for (const transaction of unprocessedTransactions) {
-          await this.queueTransactionForProcessing(transaction)
-        }
+        await this.queueTransactionForProcessing(unprocessedTransactions)
 
-        skip += batchSize
         this.logger.debug(`Queued ${unprocessedTransactions.length} transactions for processing`)
 
         await sleep(DELAYS.QUEUE_PROCESSING)
@@ -238,32 +245,29 @@ export class ScannerService {
     }
   }
 
-  private async queueTransactionForProcessing(transaction: TransactionEvent) {
+  private async queueTransactionForProcessing(transactions: TransactionEvent[]) {
     try {
-      await this.transactionQueue.add(
-        JOB_TYPES.PROCESS_TRANSACTION,
-        {
-          signature: transaction.signature,
-          slot: transaction.slot,
-          blockTime: transaction.block_time,
-        },
-        {
-          priority: -transaction.slot, // Lower slot = higher priority (negative for min-heap behavior)
-          attempts: this.config.maxRetries,
-          backoff: {
-            type: 'exponential',
-            delay: this.config.retryDelayMs,
+      await this.transactionQueue.addBulk(
+        transactions.map((transaction) => ({
+          name: JOB_TYPES.PROCESS_TRANSACTION,
+          data: {
+            signature: transaction.signature,
+            slot: transaction.slot,
+            blockTime: transaction.blockTime,
           },
-        },
+        })),
       )
 
-      // Mark as processed in our database
-      await this.transactionModel.updateOne(
-        { _id: transaction._id },
-        { processed: true, updated_at: new Date() },
+      // Mark as queued (NOT processed yet - will be marked processed in TransactionProcessor)
+      await this.transactionModel.updateMany(
+        { _id: { $in: transactions.map((tx) => tx._id) } },
+        { queued: true, updated_at: new Date() },
       )
     } catch (error) {
-      this.logger.error(`Failed to queue transaction ${transaction.signature}:`, error)
+      this.logger.error(
+        `Failed to queue transaction from ${transactions[0].signature} to ${transactions.at(-1).signature}:`,
+        error,
+      )
     }
   }
 
@@ -328,7 +332,7 @@ export class ScannerService {
         ? {
             signature: oldestTransaction.signature,
             slot: oldestTransaction.slot,
-            blockTime: oldestTransaction.block_time,
+            blockTime: oldestTransaction.blockTime,
           }
         : null,
     }
@@ -350,7 +354,7 @@ export class ScannerService {
         ? {
             signature: oldestTransaction.signature,
             slot: oldestTransaction.slot,
-            blockTime: oldestTransaction.block_time,
+            blockTime: oldestTransaction.blockTime,
           }
         : null,
     }

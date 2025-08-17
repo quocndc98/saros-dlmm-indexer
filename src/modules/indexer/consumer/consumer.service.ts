@@ -6,6 +6,8 @@ import { PositionProcessor } from '../processors/position.processor'
 import { CompositionFeesProcessor } from '../processors/composition-fees.processor'
 import { DlqProcessor } from '../processors/dlq.processor'
 import { QuoteAssetProcessor } from '../processors/quote-asset.processor'
+import { InitializePairProcessor } from '../processors/initialize-pair.processor'
+import { InitializeBinStepConfigProcessor } from '../processors/initialize-bin-step-config.processor'
 import { QUEUE_NAME } from '../../queue/queue.constant'
 import { Logger } from '@/lib'
 import { Worker } from 'bullmq'
@@ -23,13 +25,15 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly swapProcessor: SwapProcessor,
     private readonly positionProcessor: PositionProcessor,
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
+    private readonly initializePairProcessor: InitializePairProcessor,
+    private readonly initializeBinStepConfigProcessor: InitializeBinStepConfigProcessor,
     private readonly dlqProcessor: DlqProcessor,
     private readonly quoteAssetProcessor: QuoteAssetProcessor,
   ) {}
 
   async onModuleInit() {
     this.logger.log('Starting consumer workers...')
-    // await this.startWorkers()
+    await this.startWorkers()
   }
 
   async onModuleDestroy() {
@@ -89,6 +93,28 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       }
     )
     this.workers.push(compositionFeesWorker)
+
+    // Initialize pair processor worker
+    const initializePairWorker = new Worker(
+      QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR,
+      async (job) => await this.initializePairProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(initializePairWorker)
+
+    // Initialize bin step config processor worker
+    const initializeBinStepConfigWorker = new Worker(
+      QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR,
+      async (job) => await this.initializeBinStepConfigProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(initializeBinStepConfigWorker)
 
     // DLQ processor worker
     const dlqWorker = new Worker(

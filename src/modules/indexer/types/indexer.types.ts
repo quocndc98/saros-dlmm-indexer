@@ -1,4 +1,14 @@
-import { PublicKey } from '@solana/web3.js'
+import { PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
+
+export interface ParsedInstructionMessage {
+  block_number: number // slot
+  transaction_signature: string
+  instruction: PartiallyDecodedInstruction
+  instruction_index: number
+  inner_instruction_index?: number
+  is_inner: boolean
+  block_time?: number
+}
 
 export interface ParsedTransactionMessage {
   signature: string
@@ -7,17 +17,6 @@ export interface ParsedTransactionMessage {
   instructions: ParsedInstructionMessage[]
   isSuccessful: boolean
   errorMessage?: any
-}
-
-export interface ParsedInstructionMessage {
-  signature: string
-  slot: number
-  blockTime: number
-  instructionIndex: number
-  instructionName: string
-  instructionData: any
-  accounts: PublicKey[]
-  innerInstructions?: ParsedInstructionMessage[]
 }
 
 export interface SwapEventData {
