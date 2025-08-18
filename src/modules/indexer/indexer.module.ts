@@ -19,6 +19,7 @@ import { QuoteAsset, QuoteAssetSchema } from './schemas/quote-asset.schema'
 import { Pair, PairSchema } from './schemas/pair.schema'
 import { TokenMint, TokenMintSchema } from './schemas/token-mint.schema'
 import { BinStepConfig, BinStepConfigSchema } from './schemas/bin-step-config.schema'
+import { Bin, BinSchema } from './schemas/bin.schema'
 
 // Services
 import { SolanaService } from './services/solana.service'
@@ -34,6 +35,7 @@ import { PositionProcessor } from './processors/position.processor'
 import { CompositionFeesProcessor } from './processors/composition-fees.processor'
 import { InitializePairProcessor } from './processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from './processors/initialize-bin-step-config.processor'
+import { InitializeBinArrayProcessor } from './processors/initialize-bin-array.processor'
 import { DlqProcessor } from './processors/dlq.processor'
 import { QuoteAssetProcessor } from './processors/quote-asset.processor'
 
@@ -67,6 +69,7 @@ import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shar
       { name: Pair.name, schema: PairSchema },
       { name: TokenMint.name, schema: TokenMintSchema },
       { name: BinStepConfig.name, schema: BinStepConfigSchema },
+      { name: Bin.name, schema: BinSchema },
       { name: Instruction.name, schema: InstructionSchema },
       { name: TokenAccount.name, schema: TokenAccountSchema },
       { name: LiquidityShares.name, schema: LiquiditySharesSchema }
@@ -88,6 +91,7 @@ import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shar
     CompositionFeesProcessor,
     InitializePairProcessor,
     InitializeBinStepConfigProcessor,
+    InitializeBinArrayProcessor,
     DlqProcessor,
     QuoteAssetProcessor,
 

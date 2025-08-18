@@ -32,7 +32,7 @@ export class QuoteAssetProcessor extends BaseProcessor {
       const decodedData = Buffer.from(bs58.decode(instruction.data))
       const [identifier, data] = splitAt(decodedData, 8)
 
-      // Check if this is an event instruction
+      // Only use event instructions
       if (!identifier.equals(EVENT_IDENTIFIER)) {
         this.logger.warn('Not an event instruction')
         return

@@ -87,10 +87,27 @@ export type PositionDecreaseEvent = {
   liquidity_burned: BN[]
 }
 
+export type CompositionFeesEvent = {
+  pair: PublicKey
+  active_id: number
+  composition_fees_x: number
+  composition_fees_y: number
+  protocol_fees_x: number
+  protocol_fees_y: number
+}
+
 export type InitializeBinStepConfigArgs = {
   bin_step: number
   availability: ConfigAvailability
   fee_parameters: StaticFeeParameters
+}
+
+export type InitializeBinArrayArgs = {
+  id: number
+}
+
+export type InitializePairArgs = {
+  active_id: number
 }
 
 export type ConfigAvailability = { Open?: {} | null; Closed?: {} | null }

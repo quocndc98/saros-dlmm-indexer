@@ -9,6 +9,7 @@ export const QUEUE_NAME = {
   QUOTE_ASSET_PROCESSOR: 'quote-asset-processor',
   INITIALIZE_PAIR_PROCESSOR: 'initialize-pair-processor',
   INITIALIZE_BIN_STEP_CONFIG_PROCESSOR: 'initialize-bin-step-config-processor',
+  INITIALIZE_BIN_ARRAY_PROCESSOR: 'initialize-bin-array-processor',
 }
 
 export const JOB_TYPES = {
@@ -23,6 +24,7 @@ export const JOB_TYPES = {
   PROCESS_COMPOSITION_FEES: 'process-composition-fees',
   PROCESS_INITIALIZE_PAIR: 'process-initialize-pair',
   PROCESS_INITIALIZE_BIN_STEP_CONFIG: 'process-initialize-bin-step-config',
+  PROCESS_INITIALIZE_BIN_ARRAY: 'process-initialize-bin-array',
   PROCESS_QUOTE_ASSET: 'process-quote-asset',
   PROCESS_DLQ: 'process-dlq',
 } as const

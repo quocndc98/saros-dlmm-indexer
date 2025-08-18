@@ -8,6 +8,7 @@ import { DlqProcessor } from '../processors/dlq.processor'
 import { QuoteAssetProcessor } from '../processors/quote-asset.processor'
 import { InitializePairProcessor } from '../processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from '../processors/initialize-bin-step-config.processor'
+import { InitializeBinArrayProcessor } from '../processors/initialize-bin-array.processor'
 import { QUEUE_NAME } from '../../queue/queue.constant'
 import { Logger } from '@/lib'
 import { Worker } from 'bullmq'
@@ -27,6 +28,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
     private readonly initializePairProcessor: InitializePairProcessor,
     private readonly initializeBinStepConfigProcessor: InitializeBinStepConfigProcessor,
+    private readonly initializeBinArrayProcessor: InitializeBinArrayProcessor,
     private readonly dlqProcessor: DlqProcessor,
     private readonly quoteAssetProcessor: QuoteAssetProcessor,
   ) {}
@@ -115,6 +117,17 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       }
     )
     this.workers.push(initializeBinStepConfigWorker)
+
+    // Initialize bin array processor worker
+    const initializeBinArrayWorker = new Worker(
+      QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR,
+      async (job) => await this.initializeBinArrayProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 2
+      }
+    )
+    this.workers.push(initializeBinArrayWorker)
 
     // DLQ processor worker
     const dlqWorker = new Worker(

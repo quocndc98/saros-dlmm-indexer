@@ -170,28 +170,27 @@ export class ScannerService {
   }
 
   private async insertBatchTransactionEvent(signatures: ConfirmedSignatureInfo[]) {
-    const transactionEvents = signatures.map((sig) => ({
-      signature: sig.signature,
-      slot: sig.slot,
-      block_time: new Date(sig.blockTime * 1000),
-      is_successful: !sig.err,
-      error_message: sig.err,
-      processed: false,
-      queued: false, // Initialize as not queued
-    }))
+    const transactionEvents = signatures
+      .filter((sig) => !sig.err)
+      .map((sig) => ({
+        signature: sig.signature,
+        slot: sig.slot,
+        blockTime: new Date(sig.blockTime * 1000),
+        processed: false,
+        queued: false, // Initialize as not queued
+      }))
 
     // Bulk insert, ignore duplicates
-    // TODO: filter out failed transaction
     try {
       await this.transactionModel.insertMany(transactionEvents, {
         ordered: false, // Continue inserting even if some fail due to duplicates
       })
       this.logger.log(`Indexed ${transactionEvents.length} transaction signatures`)
     } catch (error) {
-      // Ignore duplicate key errors, log others
-      if (error.code !== 11000) {
-        this.logger.error('Error indexing signatures:', error)
-      }
+      this.logger.error(
+        '[insertBatchTransactionEvent] Error insert batch transaction events:',
+        error,
+      )
     }
   }
 
