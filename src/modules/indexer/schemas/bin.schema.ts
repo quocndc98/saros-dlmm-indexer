@@ -6,7 +6,7 @@ export type BinDocument = Bin & Document
 @Schema({ timestamps: true })
 export class Bin {
   @Prop({ required: true, unique: true })
-  id: string
+  id: string // Format `<pairId>-<lbBinId>`
 
   @Prop({ required: true })
   lbBinId: number

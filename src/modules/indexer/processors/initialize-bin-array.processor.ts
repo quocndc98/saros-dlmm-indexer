@@ -116,10 +116,10 @@ export class InitializeBinArrayProcessor extends BaseProcessor {
 
       for (let binIndex = 0; binIndex < BIN_ARRAY_SIZE; binIndex++) {
         const lbBinId = decoded.index * BIN_ARRAY_SIZE + binIndex
-        const binDocumentId = `${decoded.pair}-${lbBinId}`
+        const binId = `${decoded.pair}-${lbBinId}`
 
         const binData: Bin = {
-          id: binDocumentId,
+          id: binId,
           lbBinId: lbBinId,
           binArrayId: decoded.bin_array,
           pairId: decoded.pair,

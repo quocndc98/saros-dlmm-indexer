@@ -18,7 +18,7 @@ export abstract class BaseProcessor {
   }
 
   protected logJobStart(job: Job): void {
-    this.logger.debug(`Starting job ${job.id} with data:`, job.data)
+    this.logger.debug(`Starting job ${job.id} with data: ${JSON.stringify(job.data)}`)
   }
 
   protected logJobComplete(job: Job): void {

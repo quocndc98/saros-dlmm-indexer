@@ -18,3 +18,8 @@ export enum QuoteAssetType {
   Stable = 'STABLE',
   Other = 'OTHER',
 }
+
+export enum SwapType {
+  ExactInput = 'EXACT_INPUT',
+  ExactOutput = 'EXACT_OUTPUT',
+}

@@ -110,6 +110,18 @@ export type InitializePairArgs = {
   active_id: number
 }
 
+export type SwapArgs = {
+  amount: number
+  other_amount_threshold: number
+  swap_for_y: boolean
+  swap_type: SwapType
+}
+
+export type SwapType = {
+  ExactInput?: {} | null
+  ExactOutput?: {} | null
+}
+
 export type ConfigAvailability = { Open?: {} | null; Closed?: {} | null }
 
 export type QuoteAssetBadgeInitializationEvent = {

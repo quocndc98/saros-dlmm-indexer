@@ -68,7 +68,7 @@ export class QuoteAssetProcessor extends BaseProcessor {
   private async processInitEvent(eventData: QuoteAssetBadgeInitializationEvent): Promise<void> {
     try {
       // Check if quote asset already exists (matching Rust logic)
-      const existing = await this.quoteAssetModel.findOne({
+      const existing = await this.quoteAssetModel.exists({
         id: eventData.quote_asset_badge.toBase58(),
       })
 
@@ -98,7 +98,7 @@ export class QuoteAssetProcessor extends BaseProcessor {
   private async processUpdateEvent(eventData: QuoteAssetBadgeUpdateEvent): Promise<void> {
     try {
       // Find existing quote asset (matching Rust logic)
-      const existing = await this.quoteAssetModel.findOne({
+      const existing = await this.quoteAssetModel.exists({
         id: eventData.quote_asset_badge.toBase58(),
       })
 

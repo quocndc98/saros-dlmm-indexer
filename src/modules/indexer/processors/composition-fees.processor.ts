@@ -181,14 +181,21 @@ export class CompositionFeesProcessor extends BaseProcessor {
       const protocolFeesYUsd = BinMath.multiply(protocolFeesYNormalized, priceYUsd)
 
       // 6. Create event ID (matching Rust get_composition_fees_event_id)
-      const eventId = `${metadata.block_number}-${metadata.transaction_signature}-${metadata.instruction_index}-${metadata.inner_instruction_index || 'null'}-${decoded.pair}-${decoded.active_id}`
+      const binId = `${decoded.pair}-${decoded.active_id}`
+      const eventId = this.getCompositionFeesEventId(
+        metadata.block_number,
+        metadata.transaction_signature,
+        metadata.instruction_index,
+        metadata.inner_instruction_index ?? null,
+        binId
+      )
 
       // 7. Insert composition fees event (matching Rust logic)
       const eventData: CompositionFeesEvent = {
         id: eventId,
         signature: metadata.transaction_signature,
         pairId: pair.id,
-        binId: `${pair.id}-${decoded.active_id}`,
+        binId,
         lbBinId: decoded.active_id,
         compositionFeesX: decoded.composition_fees_x.toString(),
         compositionFeesXNative,
@@ -235,5 +242,16 @@ export class CompositionFeesProcessor extends BaseProcessor {
       this.logger.error(`Error processing composition fees event: ${error.message}`)
       throw error
     }
+  }
+
+  private getCompositionFeesEventId(
+    blockNumber: number,
+    signature: string,
+    instructionIndex: number,
+    innerInstructionIndex: number | null,
+    binId: string
+  ): string {
+    const innerIndexStr = innerInstructionIndex !== null ? innerInstructionIndex.toString() : '*'
+    return `${blockNumber}-${signature}-${instructionIndex}-${innerIndexStr}-${binId}`
   }
 }
