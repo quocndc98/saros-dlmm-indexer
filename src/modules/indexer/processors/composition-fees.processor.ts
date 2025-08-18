@@ -12,6 +12,8 @@ import { splitAt } from '../../../utils/helper'
 import { BinMath } from '../../../utils/bin-math'
 import { EVENT_IDENTIFIER } from '../../../liquidity-book/liquidity-book.constant'
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
+import { InstructionService } from '../services/instruction.service'
+import { ProcessorName } from '../types/enums'
 
 // Constants from Rust
 const COMPOSITION_FEES_EVENT_DISCRIMINATOR = Buffer.from([83, 234, 249, 47, 88, 125, 2, 86])
@@ -34,6 +36,7 @@ export class CompositionFeesProcessor extends BaseProcessor {
     private readonly pairModel: Model<PairDocument>,
     @InjectModel(TokenMint.name)
     private readonly tokenMintModel: Model<TokenMintDocument>,
+    private readonly instructionService: InstructionService,
   ) {
     super(CompositionFeesProcessor.name)
   }
@@ -117,6 +120,22 @@ export class CompositionFeesProcessor extends BaseProcessor {
     }
   ): Promise<void> {
     try {
+      // Check if instruction already processed (matching Rust instruction deduplication)
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
+        blockNumber: metadata.block_number,
+        signature: metadata.transaction_signature,
+        processorName: ProcessorName.CompositionFeesProcessor,
+        instructionIndex: metadata.instruction_index,
+        innerInstructionIndex: metadata.inner_instruction_index || null,
+        isInner: Boolean(metadata.inner_instruction_index),
+        blockTime: metadata.block_time,
+      })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(`Composition fees event already processed for signature: ${metadata.transaction_signature}`)
+        return
+      }
+
       // 1. Find the pair (matching Rust logic)
       this.logger.log(`Finding pair: ${decoded.pair}`)
       const pair = await this.pairModel.findOne({ id: decoded.pair }).lean()
@@ -231,7 +250,6 @@ export class CompositionFeesProcessor extends BaseProcessor {
           activeId: decoded.active_id,
           protocolFeesX: newProtocolFeesX,
           protocolFeesY: newProtocolFeesY,
-          updatedAt: new Date(),
         }
       )
 
