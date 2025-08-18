@@ -19,7 +19,8 @@ import {
 } from '../../../liquidity-book/liquidity-book.constant'
 import { BinSwapEvent as BinSwapEventDecoded, SwapArgs } from '../../../liquidity-book/liquidity-book.type'
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
-import { SwapType } from '../types/enums'
+import { ProcessorName, SwapType } from '../types/enums'
+import { InstructionService } from '../services/instruction.service'
 
 // Constants from Rust
 const INSTRUCTION_IDENTIFIER = [248, 198, 158, 145, 225, 117, 135, 200]
@@ -53,6 +54,7 @@ export class SwapProcessor extends BaseProcessor {
     private readonly pairModel: Model<PairDocument>,
     @InjectModel(TokenMint.name)
     private readonly tokenMintModel: Model<TokenMintDocument>,
+    private readonly instructionService: InstructionService,
   ) {
     super(SwapProcessor.name)
   }
@@ -120,6 +122,22 @@ export class SwapProcessor extends BaseProcessor {
     blockTime: number | null,
   ): Promise<void> {
     try {
+      // Check if instruction already processed (matching Rust instruction deduplication)
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
+        blockNumber,
+        signature,
+        processorName: ProcessorName.SwapProcessor,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
+      })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(`Swap instruction already processed for signature: ${signature}`)
+        return
+      }
+
       // Decode swap instruction (matching Rust decode_instruction)
       const decoded = this.decodeSwapInstruction(instruction)
       if (!decoded) {
@@ -207,6 +225,22 @@ export class SwapProcessor extends BaseProcessor {
     blockTime: number | null,
   ): Promise<void> {
     try {
+      // Check if instruction already processed (matching Rust instruction deduplication)
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
+        blockNumber,
+        signature,
+        processorName: ProcessorName.SwapProcessor,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
+      })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(`Bin swap event already processed for signature: ${signature}`)
+        return
+      }
+
       // Decode bin swap event (matching Rust BinSwapEventDecoded::decode)
       const decoded = LiquidityBookLibrary.decodeType<BinSwapEventDecoded>(
         TYPE_NAMES.BIN_SWAP_EVENT,
@@ -257,7 +291,6 @@ export class SwapProcessor extends BaseProcessor {
           $set: {
             reserveX: newReserveX,
             reserveY: newReserveY,
-            updatedAt: new Date(),
           },
         },
       )
