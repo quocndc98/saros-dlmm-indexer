@@ -18,3 +18,7 @@ export enum QuoteAssetType {
   Stable = 'STABLE',
   Other = 'OTHER',
 }
+
+export enum ProcessorName {
+  CreatePositionProcessor = 'CreatePositionProcessor',
+}

@@ -66,3 +66,47 @@ export interface SolanaTransactionData {
   transaction: any
   meta: any
 }
+
+export interface CreatePositionDecoded {
+  relativeBinIdLeft: number
+  relativeBinIdRight: number
+  pair: string
+  position: string
+  positionMint: string
+  positionTokenAccount: string
+}
+
+export interface PositionCreationEvent {
+  pair: string
+  position: string
+  positionMint: string
+  lowerBinId: number
+  upperBinId: number
+}
+
+export interface CreatePositionArgs {
+  relative_bin_id_left: number
+  relative_bin_in_right: number
+}
+
+export interface UiTokenAccount {
+  mint: string
+  owner: string
+  tokenAmount: {
+    amount: string
+    decimals: number
+    uiAmount: number | null
+    uiAmountString: string
+  }
+  delegate?: string
+  state: 'initialized' | 'uninitialized' | 'frozen'
+  isNative: boolean
+  rentExemptReserve?: string
+  delegatedAmount?: {
+    amount: string
+    decimals: number
+    uiAmount: number | null
+    uiAmountString: string
+  }
+  closeAuthority?: string
+}
