@@ -48,6 +48,9 @@ import { ConsumerJobService } from './jobs/consumer-job.service'
 
 // Controllers
 import { IndexerController } from './controllers/indexer.controller'
+import { Instruction, InstructionSchema } from './schemas/instruction.schema'
+import { TokenAccount, TokenAccountSchema } from './schemas/token-account.schema'
+import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shares.schema'
 
 @Module({
   imports: [
@@ -67,6 +70,9 @@ import { IndexerController } from './controllers/indexer.controller'
       { name: TokenMint.name, schema: TokenMintSchema },
       { name: BinStepConfig.name, schema: BinStepConfigSchema },
       { name: Bin.name, schema: BinSchema },
+      { name: Instruction.name, schema: InstructionSchema },
+      { name: TokenAccount.name, schema: TokenAccountSchema },
+      { name: LiquidityShares.name, schema: LiquiditySharesSchema }
     ]),
   ],
   controllers: [IndexerController],

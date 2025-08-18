@@ -23,3 +23,7 @@ export enum SwapType {
   ExactInput = 'EXACT_INPUT',
   ExactOutput = 'EXACT_OUTPUT',
 }
+
+export enum ProcessorName {
+  CreatePositionProcessor = 'CreatePositionProcessor',
+}

@@ -1,25 +1,28 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document } from 'mongoose'
 
 @Schema({ timestamps: true })
-export class Position extends Document {
+export class Position {
+  @Prop({ 
+    type: String, 
+    required: true, 
+    unique: true,
+  })
+  id: string
+
+  @Prop({ required: true })
+  pairId: string
+
   @Prop({ required: true, unique: true })
-  positionMint: string
+  positionMintId: string
 
   @Prop({ required: true })
-  pair: string
+  ownerId: string
 
   @Prop({ required: true })
-  owner: string
+  lowerBinLbId: number
 
   @Prop({ required: true })
-  lowerBinId: number
-
-  @Prop({ required: true })
-  upperBinId: number
-
-  @Prop({ type: [String], required: true })
-  liquidityShares: string[]
+  upperBinLbId: number
 }
 
 export const PositionSchema = SchemaFactory.createForClass(Position)

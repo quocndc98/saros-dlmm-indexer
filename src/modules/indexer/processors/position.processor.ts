@@ -2,13 +2,19 @@ import { Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Job } from 'bullmq'
-import { PublicKey } from '@solana/web3.js'
+import { PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
 import { BaseProcessor } from './base.processor'
 import { Position } from '../schemas/position.schema'
 import { PositionUpdateEvent } from '../schemas/position-update-event.schema'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { SolanaService } from '../services/solana.service'
-import { INSTRUCTION_NAMES } from '../constants/indexer.constants'
+import { EVENT_IDENTIFIER_POSITION_CREATE, INSTRUCTION_IDENTIFIER_POSITION_CREATE, JOB_TYPES, MAX_BIN_PER_POSITION_CREATE } from '../constants/indexer.constants'
+import { CreatePositionArgs, CreatePositionDecoded, ParsedInstructionMessage } from '../types/indexer.types'
+import bs58 from 'bs58'
+import { Instruction } from '../schemas/instruction.schema'
+import { ProcessorName } from '../types/enums'
+import { TokenAccount } from '../schemas/token-account.schema'
+import { LiquidityShares } from '../schemas/liquidity-shares.schema'
 
 @Injectable()
 export class PositionProcessor extends BaseProcessor {
@@ -17,6 +23,12 @@ export class PositionProcessor extends BaseProcessor {
     private readonly positionModel: Model<Position>,
     @InjectModel(PositionUpdateEvent.name)
     private readonly positionUpdateEventModel: Model<PositionUpdateEvent>,
+    @InjectModel(Instruction.name)
+    private readonly instructionModel: Model<Instruction>,
+    @InjectModel(TokenAccount.name)
+    private readonly tokenAccountModel: Model<TokenAccount>,
+    @InjectModel(LiquidityShares.name)
+    private readonly liquiditySharesModel: Model<LiquidityShares>,
     private readonly solanaService: SolanaService,
   ) {
     super(PositionProcessor.name)
@@ -24,26 +36,14 @@ export class PositionProcessor extends BaseProcessor {
 
   async process(job: Job): Promise<void> {
     this.logJobStart(job)
-
     try {
-      const instruction = job.data
-      const { signature, slot, blockTime, instructionName, instructionData, accounts } = instruction
-
-      switch (instructionName) {
-        case INSTRUCTION_NAMES.CREATE_POSITION :
-          await this.processCreatePosition(signature, slot, blockTime, instructionData, accounts)
-          break
-        case INSTRUCTION_NAMES.INCREASE_POSITION:
-          await this.processIncreasePosition(signature, slot, blockTime, instructionData, accounts)
-          break
-        case INSTRUCTION_NAMES.DECREASE_POSITION:
-          await this.processDecreasePosition(signature, slot, blockTime, instructionData, accounts)
-          break
-        case INSTRUCTION_NAMES.CLOSE_POSITION:
-          await this.processClosePosition(signature, slot, blockTime, instructionData, accounts)
+      const jobType = job.name
+      switch (jobType) {
+        case JOB_TYPES.PROCESS_POSITION_CREATE :
+          await this.processCreatePosition(job.data)
           break
         default:
-          this.logger.warn(`Unknown position instruction: ${instructionName}`)
+          this.logger.warn(`Unknown position instruction: ${jobType}`)
       }
 
       this.logJobComplete(job)
@@ -52,224 +52,202 @@ export class PositionProcessor extends BaseProcessor {
     }
   }
 
-  private async processCreatePosition(
-    signature: string,
-    slot: number,
-    blockTime: number,
-    instructionData: any,
-    accounts: PublicKey[]
-  ): Promise<void> {
-    try {
-      const positionData = await this.extractPositionData('createPosition', instructionData, accounts)
-      if (!positionData) return
-
-      // Create new position
-      const position = new this.positionModel({
-        position_mint: positionData.positionMint.toBase58(),
-        pair: positionData.pair.toBase58(),
-        owner: positionData.user.toBase58(),
-        lower_bin_id: positionData.lowerBinId,
-        upper_bin_id: positionData.upperBinId,
-        liquidity_shares: positionData.liquidityShares,
-      })
-
-      await position.save()
-
-      // Create position update event
-      const updateEvent = new this.positionUpdateEventModel({
-        signature,
-        slot,
-        block_time: new Date(blockTime * 1000),
-        position_mint: positionData.positionMint.toBase58(),
-        pair: positionData.pair.toBase58(),
-        user: positionData.user.toBase58(),
-        event_type: 'create',
-        bin_ids: positionData.binIds,
-        amounts_x: positionData.amountsX,
-        amounts_y: positionData.amountsY,
-        liquidity_shares: positionData.liquidityShares,
-      })
-
-      await updateEvent.save()
-
-      this.logger.log(`Created position ${positionData.positionMint.toBase58()}`)
-    } catch (error) {
-      this.logger.error('Error processing create position:', error)
-      throw error
+  async processCreatePosition(input:  ParsedInstructionMessage ) {
+    const { block_number, transaction_signature, instruction, instruction_index, inner_instruction_index, is_inner, block_time } = input
+    const decodedData = this.decodeInstructionData(instruction.data)
+    if (!decodedData) {
+        return false
     }
+
+    const [identifier, _data] = this.splitAt(decodedData, 8)
+    if (identifier.equals(INSTRUCTION_IDENTIFIER_POSITION_CREATE)) {
+      return await this.processInstructionPath(instruction, block_number, instruction_index, inner_instruction_index, transaction_signature, is_inner, block_time)
+    }
+
+    if (identifier.equals(EVENT_IDENTIFIER_POSITION_CREATE)) {
+      // TODO: Implement event handling
+    }
+
+
+    return false
   }
 
-  private async processIncreasePosition(
-    signature: string,
-    slot: number,
-    blockTime: number,
-    instructionData: any,
-    accounts: PublicKey[]
-  ): Promise<void> {
+  private async processInstructionPath(
+    instruction: PartiallyDecodedInstruction,
+    blockNumber: number,
+    instructionIndex: number,
+    innerInstructionIndex: number | null,
+    txnSignature: string,
+    isInner: boolean,
+    blockTime: number | null
+  ): Promise<boolean> {
     try {
-      const positionData = await this.extractPositionData('increasePosition', instructionData, accounts)
-      if (!positionData) return
-
-      // Update existing position
-      await this.positionModel.updateOne(
-        { position_mint: positionData.positionMint.toBase58() },
-        {
-          liquidity_shares: positionData.liquidityShares,
-          updated_at: new Date(),
-        }
-      )
-
-      // Create position update event
-      const updateEvent = new this.positionUpdateEventModel({
-        signature,
-        slot,
-        block_time: new Date(blockTime * 1000),
-        position_mint: positionData.positionMint.toBase58(),
-        pair: positionData.pair.toBase58(),
-        user: positionData.user.toBase58(),
-        event_type: 'increase',
-        bin_ids: positionData.binIds,
-        amounts_x: positionData.amountsX,
-        amounts_y: positionData.amountsY,
-        liquidity_shares: positionData.liquidityShares,
-      })
-
-      await updateEvent.save()
-
-      this.logger.log(`Increased position ${positionData.positionMint.toBase58()}`)
-    } catch (error) {
-      this.logger.error('Error processing increase position:', error)
-      throw error
-    }
-  }
-
-  private async processDecreasePosition(
-    signature: string,
-    slot: number,
-    blockTime: number,
-    instructionData: any,
-    accounts: PublicKey[]
-  ): Promise<void> {
-    try {
-      const positionData = await this.extractPositionData('decreasePosition', instructionData, accounts)
-      if (!positionData) return
-
-      // Update existing position
-      await this.positionModel.updateOne(
-        { position_mint: positionData.positionMint.toBase58() },
-        {
-          liquidity_shares: positionData.liquidityShares,
-          updated_at: new Date(),
-        }
-      )
-
-      // Create position update event
-      const updateEvent = new this.positionUpdateEventModel({
-        signature,
-        slot,
-        block_time: new Date(blockTime * 1000),
-        position_mint: positionData.positionMint.toBase58(),
-        pair: positionData.pair.toBase58(),
-        user: positionData.user.toBase58(),
-        event_type: 'decrease',
-        bin_ids: positionData.binIds,
-        amounts_x: positionData.amountsX,
-        amounts_y: positionData.amountsY,
-        liquidity_shares: positionData.liquidityShares,
-      })
-
-      await updateEvent.save()
-
-      this.logger.log(`Decreased position ${positionData.positionMint.toBase58()}`)
-    } catch (error) {
-      this.logger.error('Error processing decrease position:', error)
-      throw error
-    }
-  }
-
-  private async processClosePosition(
-    signature: string,
-    slot: number,
-    blockTime: number,
-    instructionData: any,
-    accounts: PublicKey[]
-  ): Promise<void> {
-    try {
-      const positionData = await this.extractPositionData('closePosition', instructionData, accounts)
-      if (!positionData) return
-
-      // Remove position
-      await this.positionModel.deleteOne({
-        position_mint: positionData.positionMint.toBase58()
-      })
-
-      // Create position update event
-      const updateEvent = new this.positionUpdateEventModel({
-        signature,
-        slot,
-        block_time: new Date(blockTime * 1000),
-        position_mint: positionData.positionMint.toBase58(),
-        pair: positionData.pair.toBase58(),
-        user: positionData.user.toBase58(),
-        event_type: 'close',
-        bin_ids: positionData.binIds,
-        amounts_x: positionData.amountsX,
-        amounts_y: positionData.amountsY,
-        liquidity_shares: [],
-      })
-
-      await updateEvent.save()
-
-      this.logger.log(`Closed position ${positionData.positionMint.toBase58()}`)
-    } catch (error) {
-      this.logger.error('Error processing close position:', error)
-      throw error
-    }
-  }
-
-  private async extractPositionData(instructionName: string, instructionData: any, accounts: PublicKey[]): Promise<any | null> {
-    try {
-      const idlIx = LiquidityBookLibrary.getIdlInstructionByName(instructionName)
-      if (!idlIx) {
-        this.logger.error(`${instructionName} instruction not found in IDL`)
-        return null
+      // Decode instruction (matching Rust decode_instruction)
+      const decodedPosition = this.decodeInstruction(instruction)
+      if (!decodedPosition) {
+        throw new Error('Failed to decode create position instruction')
       }
 
-      const accountsMap = LiquidityBookLibrary.getAccountsByName(
+      // On-chain call to get owner of position (matching Rust logic exactly)
+      const positionTokenAccount = await this.solanaService.getTokenAccount(
+        decodedPosition.positionTokenAccount
+      )
+
+      let positionTokenAccountOwner: string
+      if (!positionTokenAccount) {
+        const accountCreator = await this.solanaService.getAccountCreator(
+          decodedPosition.positionTokenAccount
+        )
+        if (!accountCreator) {
+          throw new Error(
+            `Failed to get position account creator ${decodedPosition.positionTokenAccount}`
+          )
+        }
+        positionTokenAccountOwner = accountCreator
+      } else {
+        positionTokenAccountOwner = positionTokenAccount.owner
+      }
+
+      // Check if instruction already processed (matching Rust logic)
+      const instructionId = this.getInstructionId(
+        blockNumber,
+        txnSignature,
+        ProcessorName.CreatePositionProcessor,
+        instructionIndex,
+        innerInstructionIndex
+      )
+
+      const existingInstruction = await this.instructionModel.findOne({ id: instructionId })
+      if (existingInstruction) {
+        return true // Already processed
+      }
+
+      // Insert instruction record (matching Rust instruction tracking)
+      await this.instructionModel.create({
+        id: instructionId,
+        processorName: ProcessorName.CreatePositionProcessor,
+        signature: txnSignature,
+        index: instructionIndex,
+        innerIndex: innerInstructionIndex,
+        isInner,
+        blockNumber,
+        blockTime: blockTime ? new Date(blockTime * 1000) : null,
+      })
+
+      // Check for existing position token account (matching Rust logic)
+      const existingTokenAccount = await this.tokenAccountModel.findOne({
+        id: decodedPosition.positionTokenAccount
+      })
+
+      if (!existingTokenAccount) {
+        await this.tokenAccountModel.create({
+          id: decodedPosition.positionTokenAccount,
+          ownerId: positionTokenAccountOwner,
+          tokenMintId: decodedPosition.positionMint,
+          balance: '1', // BigDecimal::from(1) in Rust
+        })
+      }
+
+      // Check if position already exists and update or insert (matching Rust match statement)
+      const existingPosition = await this.positionModel.findOne({
+        id: decodedPosition.position
+      })
+
+      if (!existingPosition) {
+        // Create liquidity shares (matching Rust loop: for liquidity_share_index in 0..=MAX_BIN_PER_POSITION - 1)
+        const liquiditySharesData = []
+        for (let liquidityShareIndex = 0; liquidityShareIndex < MAX_BIN_PER_POSITION_CREATE; liquidityShareIndex++) {
+          liquiditySharesData.push({
+            id: `${decodedPosition.position}-${liquidityShareIndex}`,
+            positionId: decodedPosition.position,
+            index: liquidityShareIndex,
+            balance: '0', // BigDecimal::from(0) in Rust
+          })
+        }
+        await this.liquiditySharesModel.insertMany(liquiditySharesData)
+
+        // Create position record (matching Rust position::ActiveModel exactly)
+        await this.positionModel.create({
+          id: decodedPosition.position,
+          pairId: decodedPosition.pair,
+          positionMintId: decodedPosition.positionMint,
+          ownerId: positionTokenAccountOwner,
+          lowerBinLbId: 0, // Set(0) in Rust for instruction path
+          upperBinLbId: 0, // Set(0) in Rust for instruction path
+        })
+
+        this.logger.log(`Created position: ${decodedPosition.position}`)
+      } else {
+        // Update existing position (matching Rust update logic)
+        await this.positionModel.updateOne(
+          { id: decodedPosition.position },
+          {
+            positionMintId: decodedPosition.positionMint,
+            ownerId: positionTokenAccountOwner,
+          }
+        )
+
+        this.logger.log(`Updated existing position: ${decodedPosition.position}`)
+      }
+
+      return true
+    } catch (error) {
+      this.logger.error('Error processing create position instruction:', error)
+      throw error
+    }
+  }
+
+  private decodeInstruction(instruction: PartiallyDecodedInstruction): CreatePositionDecoded | null {
+    try {
+      const { idlIx, decodedIx } = LiquidityBookLibrary.decodeInstruction(instruction.data)
+      const accounts = LiquidityBookLibrary.getAccountsByName(
         idlIx,
-        accounts,
-        ['pair', 'position', 'user']
+        instruction.accounts,
+        [
+          'pair',
+          'position',
+          'position_mint',
+          'position_token_account'
+        ],
       )
 
-      if (!accountsMap.pair || !accountsMap.position || !accountsMap.user) {
-        this.logger.error(`Required accounts not found for ${instructionName} instruction`)
-        return null
+      const positionArgs = decodedIx.data as CreatePositionArgs
+      const dataDecode: CreatePositionDecoded = {
+        relativeBinIdLeft: positionArgs.relative_bin_id_left,
+        relativeBinIdRight: positionArgs.relative_bin_in_right,
+        pair: accounts.pair.toString() || '',
+        position: accounts.position.toString() || '',
+        positionMint: accounts.position_mint.toString() || '',
+        positionTokenAccount: accounts.position_token_account.toString() || '',
       }
 
-      // Get position account data to extract position mint
-      const positionAccountInfo = await this.solanaService.getAccountInfo(accountsMap.position)
-      if (!positionAccountInfo?.data) {
-        this.logger.error('Position account not found')
-        return null
-      }
-
-      // Decode position account
-      const positionAccount = LiquidityBookLibrary.decodePositionAccount(positionAccountInfo.data)
-
-      return {
-        pair: accountsMap.pair,
-        positionMint: positionAccount.position_mint,
-        user: accountsMap.user,
-        lowerBinId: positionAccount.lower_bin_id,
-        upperBinId: positionAccount.upper_bin_id,
-        liquidityShares: positionAccount.liquidity_shares.map((share: any) => share.toString()),
-        binIds: instructionData.binIds || [],
-        amountsX: instructionData.amountsX?.map((amount: any) => amount.toString()) || [],
-        amountsY: instructionData.amountsY?.map((amount: any) => amount.toString()) || [],
-      }
+      return dataDecode
     } catch (error) {
-      this.logger.error(`Error extracting ${instructionName} data:`, error)
+      this.logger.warn(`Failed to decode CreatePositionArgs: ${error}`)
       return null
     }
+  }
+
+  private decodeInstructionData(data: string): Buffer | null {
+    try {
+      return Buffer.from(bs58.decode(data))
+    } catch (error) {
+      this.logger.error('Error decoding instruction data:', error)
+      return null
+    }
+  }
+
+  private splitAt(buffer: Buffer, index: number): [Buffer, Buffer] {
+    return [buffer.subarray(0, index), buffer.subarray(index)]
+  }
+  private getInstructionId(
+    blockNumber: number,
+    txnSignature: string,
+    processorName: string,
+    instructionIndex: number,
+    innerInstructionIndex: number | null
+  ): string {
+    const innerIndexStr = innerInstructionIndex ? innerInstructionIndex.toString() : '*'
+    return `${blockNumber}-${txnSignature}-${processorName.toLowerCase()}-${instructionIndex}-${innerIndexStr}`
   }
 }
