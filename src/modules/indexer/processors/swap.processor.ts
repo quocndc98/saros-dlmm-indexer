@@ -6,7 +6,7 @@ import { PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
 import bs58 from 'bs58'
 import { BaseProcessor } from './base.processor'
 import { SwapEvent, SwapEventDocument } from '../schemas/swap-event.schema'
-import { BinSwapEvent as BinSwapEventModel, BinSwapEventDocument } from '../schemas/bin-swap-event.schema'
+import { BinSwapEvent as BinSwapEventSchema, BinSwapEventDocument } from '../schemas/bin-swap-event.schema'
 import { Bin, BinDocument } from '../schemas/bin.schema'
 import { Pair, PairDocument } from '../schemas/pair.schema'
 import { TokenMint, TokenMintDocument } from '../schemas/token-mint.schema'
@@ -17,7 +17,7 @@ import {
   EVENT_IDENTIFIER,
   BIN_SWAP_EVENT_DISCRIMINATOR,
 } from '../../../liquidity-book/liquidity-book.constant'
-import { BinSwapEvent, SwapArgs } from '../../../liquidity-book/liquidity-book.type'
+import { BinSwapEvent as BinSwapEventDecoded, SwapArgs } from '../../../liquidity-book/liquidity-book.type'
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { SwapType } from '../types/enums'
 
@@ -45,7 +45,7 @@ export class SwapProcessor extends BaseProcessor {
   constructor(
     @InjectModel(SwapEvent.name)
     private readonly swapEventModel: Model<SwapEventDocument>,
-    @InjectModel(BinSwapEventModel.name)
+    @InjectModel(BinSwapEventSchema.name)
     private readonly binSwapEventModel: Model<BinSwapEventDocument>,
     @InjectModel(Bin.name)
     private readonly binModel: Model<BinDocument>,
@@ -136,7 +136,7 @@ export class SwapProcessor extends BaseProcessor {
         instructionIndex,
         innerInstructionIndex,
       )
-      const swapEventData = {
+      const swapEventData: SwapEvent = {
         id: swapEventId,
         pairId: decoded.pair,
         signature: signature,
@@ -208,7 +208,7 @@ export class SwapProcessor extends BaseProcessor {
   ): Promise<void> {
     try {
       // Decode bin swap event (matching Rust BinSwapEventDecoded::decode)
-      const decoded = LiquidityBookLibrary.decodeType<BinSwapEvent>(
+      const decoded = LiquidityBookLibrary.decodeType<BinSwapEventDecoded>(
         TYPE_NAMES.BIN_SWAP_EVENT,
         eventData,
       )
@@ -235,21 +235,21 @@ export class SwapProcessor extends BaseProcessor {
         throw new Error(`Processing bin swap event for non existent bin: ${binId}`)
       }
 
-      // Update bin reserves (matching Rust logic)
+      // Update bin reserves (matching Rust logic exactly)
       const { updateX, updateY } = decoded.swap_for_y
         ? {
             // update reserve_x with amount_in - protocol_fee, reserve_y with amount_out (negative)
-            updateX: BigInt(decoded.amount_in - decoded.protocol_fee).toString(),
+            updateX: (decoded.amount_in - decoded.protocol_fee).toString(),
             updateY: (-BigInt(decoded.amount_out)).toString(),
           }
         : {
             // update reserve_x with amount_out (negative), reserve_y with amount_in - protocol_fee
             updateX: (-BigInt(decoded.amount_out)).toString(),
-            updateY: BigInt(decoded.amount_in - decoded.protocol_fee).toString(),
+            updateY: (decoded.amount_in - decoded.protocol_fee).toString(),
           }
 
-      const newReserveX = (BigInt(bin.reserveX) + BigInt(updateX)).toString()
-      const newReserveY = (BigInt(bin.reserveY) + BigInt(updateY)).toString()
+      const newReserveX = BinMath.add(bin.reserveX, updateX)
+      const newReserveY = BinMath.add(bin.reserveY, updateY)
 
       await this.binModel.updateOne(
         { id: binId },
@@ -262,52 +262,147 @@ export class SwapProcessor extends BaseProcessor {
         },
       )
 
-      // Calculate prices (matching Rust logic)
+      // Calculate prices (matching Rust bin_math::get_price_from_id)
       const price = BinMath.getPriceFromId(pair.binStep, decoded.bin_id)
 
-      // Get token mints for price calculations
+      // Get token mints for price calculations (matching Rust logic)
       const [tokenMintX, tokenMintY] = await Promise.all([
         this.tokenMintModel.findOne({ id: pair.tokenMintXId }),
         this.tokenMintModel.findOne({ id: pair.tokenMintYId }),
       ])
 
-      if (!tokenMintX || !tokenMintY) {
-        throw new Error(`Failed to get token mints for pair ${pair.id}`)
+      if (!tokenMintX) {
+        throw new Error(`Failed to get token mint ${pair.tokenMintXId}`)
+      }
+      if (!tokenMintY) {
+        throw new Error(`Failed to get token mint ${pair.tokenMintYId}`)
       }
 
       const priceXY = BinMath.calculatePriceXY(price, tokenMintX.decimals, tokenMintY.decimals)
 
-      // TODO: Implement USD price fetching and calculations like in Rust
-      // This would require implementing token price fetching from external APIs
-      // For now, we'll store the calculated price
+      // TODO: Implement token price fetching from GeckoTerminal API like in Rust
+      // For now, use simplified pricing
+      const priceXNative = '1.0'
+      const priceXUsd = '1.0'
+      const priceYNative = '1.0'
+      const priceYUsd = '1.0'
 
-      // Create/Update bin swap event record (matching Rust structure)
+      // Look up swap event to get vault information (matching Rust logic)
+      const swapEventId = this.getSwapEventId(blockNumber, signature, instructionIndex, null)
+      const swapEvent = await this.swapEventModel.findOne({ id: swapEventId }).lean()
+
+      // Extract vault information from swap event, or use dummy values if not found
+      // This matches Rust logic exactly - they also use dummy values when swap event is missing
+      const { userVaultIn, userVaultOut, pairVaultIn, pairVaultOut } = swapEvent
+        ? decoded.swap_for_y
+          ? {
+              userVaultIn: swapEvent.userVaultX,
+              userVaultOut: swapEvent.userVaultY,
+              pairVaultIn: swapEvent.tokenVaultX,
+              pairVaultOut: swapEvent.tokenVaultY,
+            }
+          : {
+              userVaultIn: swapEvent.userVaultY,
+              userVaultOut: swapEvent.userVaultX,
+              pairVaultIn: swapEvent.tokenVaultY,
+              pairVaultOut: swapEvent.tokenVaultX,
+            }
+        : {
+            // Use dummy values if swap event not found (matching Rust exactly)
+            userVaultIn: 'dummy_user_vault_in',
+            userVaultOut: 'dummy_user_vault_out',
+            pairVaultIn: 'dummy_pair_vault_in',
+            pairVaultOut: 'dummy_pair_vault_out',
+          }
+
+      // Calculate normalized amounts (matching Rust bin_math::normalize_amount)
+      const { amountInNormalized, amountOutNormalized, feeNormalized, protocolFeeNormalized } =
+        decoded.swap_for_y
+          ? {
+              amountInNormalized: BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintX.decimals),
+              amountOutNormalized: BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintY.decimals),
+              feeNormalized: BinMath.normalizeAmount(decoded.fee.toString(), tokenMintX.decimals),
+              protocolFeeNormalized: BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintX.decimals),
+            }
+          : {
+              amountInNormalized: BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintY.decimals),
+              amountOutNormalized: BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintX.decimals),
+              feeNormalized: BinMath.normalizeAmount(decoded.fee.toString(), tokenMintY.decimals),
+              protocolFeeNormalized: BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintY.decimals),
+            }
+
+      // Calculate USD and native amounts (matching Rust logic)
+      const amountInUsd = BinMath.multiply(
+        amountInNormalized,
+        decoded.swap_for_y ? priceXUsd : priceYUsd,
+      )
+      const amountInNative = BinMath.multiply(
+        amountInNormalized,
+        decoded.swap_for_y ? priceXNative : priceYNative,
+      )
+      const amountOutUsd = BinMath.multiply(
+        amountOutNormalized,
+        decoded.swap_for_y ? priceYUsd : priceXUsd,
+      )
+      const amountOutNative = BinMath.multiply(
+        amountOutNormalized,
+        decoded.swap_for_y ? priceYNative : priceXNative,
+      )
+      const feeUsd = BinMath.multiply(
+        feeNormalized,
+        decoded.swap_for_y ? priceXUsd : priceYUsd,
+      )
+      const feeNative = BinMath.multiply(
+        feeNormalized,
+        decoded.swap_for_y ? priceXNative : priceYNative,
+      )
+      const protocolFeeUsd = BinMath.multiply(
+        protocolFeeNormalized,
+        decoded.swap_for_y ? priceXUsd : priceYUsd,
+      )
+      const protocolFeeNative = BinMath.multiply(
+        protocolFeeNormalized,
+        decoded.swap_for_y ? priceXNative : priceYNative,
+      )
+
+      // Create bin swap event record (matching Rust structure exactly)
       const binSwapEventId = this.getBinSwapEventId(
         blockNumber,
         signature,
         instructionIndex,
         innerInstructionIndex,
-        `${decoded.pair.toBase58()}-${decoded.bin_id}`,
+        binId,
       )
 
-      const binSwapEventData = {
+      const binSwapEventData: Partial<BinSwapEventSchema> = {
         id: binSwapEventId,
-        pairId: decoded.pair.toBase58(),
         signature: signature,
-        blockNumber: blockNumber,
-        instructionIndex: instructionIndex,
-        innerInstructionIndex: innerInstructionIndex,
-        isInner: isInner,
-        blockTime: blockTime,
+        pairId: decoded.pair.toBase58(),
+        binId: binId,
+        lbBinId: decoded.bin_id,
+        userVaultIn,
+        userVaultOut,
+        pairVaultIn,
+        pairVaultOut,
         swapForY: decoded.swap_for_y,
-        protocolFee: decoded.protocol_fee.toString(),
-        binId: decoded.bin_id,
-        amountIn: decoded.amount_in.toString(),
-        amountOut: decoded.amount_out.toString(),
+        // Store only normalized amounts (matching Rust exactly)
+        amountIn: amountInNormalized,
+        amountInNative,
+        amountInUsd,
+        amountOut: amountOutNormalized,
+        amountOutNative,
+        amountOutUsd,
+        fees: feeNormalized,
+        feesNative: feeNative,
+        feesUsd: feeUsd,
+        protocolFees: protocolFeeNormalized,
+        protocolFeesNative: protocolFeeNative,
+        protocolFeesUsd: protocolFeeUsd,
         volatilityAccumulator: decoded.volatility_accumulator,
-        fee: decoded.fee.toString(),
-        price: price.toString(),
-        priceXY: priceXY.toString(),
+        index: instructionIndex,
+        innerIndex: innerInstructionIndex ?? -1,
+        blockNumber: blockNumber,
+        blockTime: new Date((blockTime ?? Date.now()) * 1000),
       }
 
       await this.binSwapEventModel.create(binSwapEventData)

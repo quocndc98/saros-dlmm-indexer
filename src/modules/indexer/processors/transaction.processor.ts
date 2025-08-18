@@ -154,6 +154,11 @@ export class TransactionProcessor extends BaseProcessor {
       console.log(eventName);
 
       switch (eventName) {
+        case EVENT_NAMES.BIN_SWAP_EVENT:
+          return {
+            queueName: QUEUE_NAME.SWAP_PROCESSOR,
+            jobType: JOB_TYPES.PROCESS_SWAP
+          }
         case EVENT_NAMES.COMPOSITION_FEES_EVENT:
           return {
             queueName: QUEUE_NAME.COMPOSITION_FEES_PROCESSOR,
