@@ -7,8 +7,12 @@ import { BaseProcessor } from './base.processor'
 import { QuoteAsset } from '../schemas/quote-asset.schema'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { splitAt } from '../../../utils/helper'
-import { QuoteAssetBadgeInitializationEvent, QuoteAssetBadgeStatus, QuoteAssetBadgeUpdateEvent } from '../../../liquidity-book/liquidity-book.type'
-import { QuoteAssetType } from '../types/enums'
+import {
+  QuoteAssetBadgeInitializationEvent,
+  QuoteAssetBadgeStatus,
+  QuoteAssetBadgeUpdateEvent,
+} from '../../../liquidity-book/liquidity-book.type'
+import { QuoteAssetStatus, QuoteAssetType } from '../types/enums'
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 
 // Constants from Rust
@@ -80,10 +84,10 @@ export class QuoteAssetProcessor extends BaseProcessor {
       }
 
       // Create new quote asset (matching Rust fields exactly)
-      const quoteAssetData = {
+      const quoteAssetData: QuoteAsset = {
         id: eventData.quote_asset_badge.toBase58(),
         tokenMintId: eventData.token_mint.toBase58(),
-        status: QuoteAssetBadgeStatus.Enabled,
+        status: QuoteAssetStatus.Enabled,
         assetType: QuoteAssetType.Other, // TODO: Update this logic
       }
 
@@ -109,9 +113,10 @@ export class QuoteAssetProcessor extends BaseProcessor {
       }
 
       // Update status (matching Rust enum conversion)
-      const statusValue = eventData.status === QuoteAssetBadgeStatus.Disabled
-        ? QuoteAssetBadgeStatus.Disabled
-        : QuoteAssetBadgeStatus.Enabled
+      const statusValue =
+        eventData.status === QuoteAssetBadgeStatus.Disabled
+          ? QuoteAssetStatus.Disabled
+          : QuoteAssetStatus.Enabled
 
       await this.quoteAssetModel.updateOne(
         { id: eventData.quote_asset_badge.toBase58() },

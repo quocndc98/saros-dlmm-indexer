@@ -158,7 +158,7 @@ export class InitializePairProcessor extends BaseProcessor {
       const tokenMintY = await this.handleTokenMint(decoded.token_mint_y, 'Y', null)
 
       // 5. Create pair record with all data from bin step config (matching Rust)
-      const pairData = {
+      const pairData: Pair = {
         id: decoded.pair,
         binStep: binStepConfig.binStep,
         activeId: decoded.active_id,
