@@ -1,37 +1,80 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
+export type CompositionFeesEventDocument = CompositionFeesEvent & Document
+
 @Schema({ timestamps: true })
-export class CompositionFeesEvent extends Document {
-  @Prop({ required: true })
+export class CompositionFeesEvent {
+  @Prop({ required: true, index: true })
+  id: string
+
+  @Prop({ required: true, index: true })
   signature: string
 
-  @Prop({ required: true })
-  slot: number
+  @Prop({ required: true, index: true })
+  pairId: string
 
   @Prop({ required: true })
-  blockTime: Date
+  binId: string
 
   @Prop({ required: true })
-  pair: string
+  lbBinId: number
+
+  // Composition fees in raw amounts
+  @Prop({ required: true, default: '0' })
+  compositionFeesX: string
+
+  @Prop({ required: true, default: '0' })
+  compositionFeesXNative: string
+
+  @Prop({ required: true, default: '0' })
+  compositionFeesXUsd: string
+
+  @Prop({ required: true, default: '0' })
+  compositionFeesY: string
+
+  @Prop({ required: true, default: '0' })
+  compositionFeesYNative: string
+
+  @Prop({ required: true, default: '0' })
+  compositionFeesYUsd: string
+
+  // Protocol fees in raw amounts
+  @Prop({ required: true, default: '0' })
+  protocolFeesX: string
+
+  @Prop({ required: true, default: '0' })
+  protocolFeesXNative: string
+
+  @Prop({ required: true, default: '0' })
+  protocolFeesXUsd: string
+
+  @Prop({ required: true, default: '0' })
+  protocolFeesY: string
+
+  @Prop({ required: true, default: '0' })
+  protocolFeesYNative: string
+
+  @Prop({ required: true, default: '0' })
+  protocolFeesYUsd: string
+
+  // Block and instruction info
+  @Prop({ required: true, index: true })
+  blockNumber: number
+
+  @Prop()
+  blockTime?: number
 
   @Prop({ required: true })
-  user: string
+  instructionIndex: number
 
-  @Prop({ required: true })
-  totalFeesX: string
-
-  @Prop({ required: true })
-  totalFeesY: string
-
-  @Prop({ type: [Number], required: true })
-  binIds: number[]
-
-  @Prop({ type: [String], required: true })
-  feesX: string[]
-
-  @Prop({ type: [String], required: true })
-  feesY: string[]
+  @Prop()
+  innerInstructionIndex?: number
 }
 
 export const CompositionFeesEventSchema = SchemaFactory.createForClass(CompositionFeesEvent)
+
+// Create compound indexes for efficient queries
+CompositionFeesEventSchema.index({ id: 1 }, { unique: true })
+CompositionFeesEventSchema.index({ pairId: 1, blockNumber: -1 })
+CompositionFeesEventSchema.index({ transactionSignature: 1 })

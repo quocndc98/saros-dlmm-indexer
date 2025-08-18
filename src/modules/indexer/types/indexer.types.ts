@@ -15,8 +15,6 @@ export interface ParsedTransactionMessage {
   slot: number
   blockTime: number
   instructions: ParsedInstructionMessage[]
-  isSuccessful: boolean
-  errorMessage?: any
 }
 
 export interface SwapEventData {

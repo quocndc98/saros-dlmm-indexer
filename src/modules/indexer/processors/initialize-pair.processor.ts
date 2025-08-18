@@ -11,13 +11,10 @@ import { TokenMint, TokenMintDocument } from '../schemas/token-mint.schema'
 import { BinStepConfig, BinStepConfigDocument } from '../schemas/bin-step-config.schema'
 import { Metaplex } from '@metaplex-foundation/js'
 import base58 from 'bs58'
+import { InitializePairArgs } from '../../../liquidity-book/liquidity-book.type'
 
 // Constants from Rust - identifier for initialize_pair instruction
 const INITIALIZE_PAIR_IDENTIFIER = [177, 114, 226, 34, 186, 150, 5, 245]
-
-interface InitializePairArgs {
-  active_id: number
-}
 
 interface InitializePairDecoded {
   active_id: number

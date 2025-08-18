@@ -6,14 +6,11 @@ import { BaseProcessor } from './base.processor'
 import { PartiallyDecodedInstruction } from '@solana/web3.js'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { Bin, BinDocument } from '../schemas/bin.schema'
+import { InitializeBinArrayArgs } from '../../../liquidity-book/liquidity-book.type'
 
 // Constants from Rust - identifier for initialize_bin_array instruction
 const INITIALIZE_BIN_ARRAY_IDENTIFIER = [35, 86, 19, 185, 78, 212, 75, 211]
 const BIN_ARRAY_SIZE = 256
-
-interface InitializeBinArrayArgs {
-  id: number
-}
 
 interface InitializeBinArrayDecoded {
   index: number
