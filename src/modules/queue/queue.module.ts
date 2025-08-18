@@ -75,6 +75,13 @@ import { REDIS_CLIENT } from '@/lib/modules/cache/cache.config'
         backoff: { type: 'exponential', delay: 1000 },
       },
     }),
+    BullModule.registerQueue({
+      name: QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+      },
+    }),
   ],
   providers: [],
   exports: [BullModule],

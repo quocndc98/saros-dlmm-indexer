@@ -26,6 +26,8 @@ export class TransactionProcessor extends BaseProcessor {
     @InjectQueue(QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR) private readonly initializePairQueue: Queue,
     @InjectQueue(QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR)
     private readonly initializeBinStepConfigQueue: Queue,
+    @InjectQueue(QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR)
+    private readonly initializeBinArrayQueue: Queue,
     @InjectQueue(QUEUE_NAME.QUOTE_ASSET_PROCESSOR) private readonly quoteAssetQueue: Queue,
     @InjectQueue(QUEUE_NAME.DLQ_PROCESSOR) private readonly dlqQueue: Queue,
     @InjectModel(TransactionEvent.name)
@@ -40,11 +42,12 @@ export class TransactionProcessor extends BaseProcessor {
 
     try {
       // const { signature } = job.data
-      // const signature =
+
       // const signature = '5Kna4KKq7KK465mbTaQrngr3zvaXEohzt8edDbyfKTvfSDDgdfPv7pSYofRfp1FvXrVDMpLziwFqKJgaGpB9yyLL' // init config
       // const signature = '4kTqfwmeVAgpSByFCrZGXt6CxezsE4dPS6SBqM3s7o4jn2RSA1K8ejnKgv537Wy1GJ3jDFsKzWFTw4z8HBk8RTkK' // init bin step config
       // const signature = '3fMXMP7fcCG23vLeNCPZrRVNA6nM7GKbC15TGYis5wPPLcwCcUGrbYFZhPfERgw9XuwoJWgjG5gmdng5DxHTTZvR' // init quote asset badge
-      const signature = '22xADbyM1btYSV8qMDr2LKT9MvGmiRtTjunrc5x5fc45AspajtsL6DwZr2dLvAsdhYNo9PhZRRp9vnnw6ntUrJCo' // init pair
+      // const signature = '22xADbyM1btYSV8qMDr2LKT9MvGmiRtTjunrc5x5fc45AspajtsL6DwZr2dLvAsdhYNo9PhZRRp9vnnw6ntUrJCo' // init pair
+      const signature = '5oFb18Cq7QEmY35A6k3aQkZbBeAgpPrYKXFwv6FPwiMKndzkZU5B1wWAi5Y353w6DW2hTcUey1ADyHfTJdQ4zxL3' // init bin array
 
       // Get the parsed transaction from Solana
       const transaction = await this.solanaService.getParsedTransaction(signature)
@@ -180,6 +183,8 @@ export class TransactionProcessor extends BaseProcessor {
         return { queueName: QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_PAIR }
       case INSTRUCTION_NAMES.INITIALIZE_BIN_STEP_CONFIG:
         return { queueName: QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_BIN_STEP_CONFIG }
+      case INSTRUCTION_NAMES.INITIALIZE_BIN_ARRAY:
+        return { queueName: QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_BIN_ARRAY }
       // case INSTRUCTION_NAMES.INITIALIZE_QUOTE_ASSET_BADGE:
       //   return { queueName: QUEUE_NAME.QUOTE_ASSET_PROCESSOR, jobType: JOB_TYPES.PROCESS_QUOTE_ASSET }
       default:
@@ -206,6 +211,9 @@ export class TransactionProcessor extends BaseProcessor {
         break
       case QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR:
         targetQueue = this.initializeBinStepConfigQueue
+        break
+      case QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR:
+        targetQueue = this.initializeBinArrayQueue
         break
       case QUEUE_NAME.QUOTE_ASSET_PROCESSOR:
         targetQueue = this.quoteAssetQueue
