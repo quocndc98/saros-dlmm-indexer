@@ -21,6 +21,7 @@ export class TransactionProcessor extends BaseProcessor {
     private readonly transactionParserService: TransactionParserService,
     @InjectQueue(QUEUE_NAME.SWAP_PROCESSOR) private readonly swapQueue: Queue,
     @InjectQueue(QUEUE_NAME.POSITION_PROCESSOR) private readonly positionQueue: Queue,
+    @InjectQueue(QUEUE_NAME.CLOSE_POSITION_PROCESSOR) private readonly closePositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR)
     private readonly compositionFeesQueue: Queue,
     @InjectQueue(QUEUE_NAME.INITIALIZE_PAIR_PROCESSOR) private readonly initializePairQueue: Queue,
@@ -84,7 +85,6 @@ export class TransactionProcessor extends BaseProcessor {
         { signature },
         {
           processed: true,
-          updatedAt: new Date(),
         },
       )
 
@@ -197,7 +197,7 @@ export class TransactionProcessor extends BaseProcessor {
       case INSTRUCTION_NAMES.DECREASE_POSITION:
         return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_DECREASE }
       case INSTRUCTION_NAMES.CLOSE_POSITION:
-        return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CLOSE }
+        return { queueName: QUEUE_NAME.CLOSE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CLOSE }
       case INSTRUCTION_NAMES.COMPOSITION_FEES:
         return { queueName: QUEUE_NAME.COMPOSITION_FEES_PROCESSOR, jobType: JOB_TYPES.PROCESS_COMPOSITION_FEES }
       case INSTRUCTION_NAMES.INITIALIZE_PAIR:
@@ -223,6 +223,9 @@ export class TransactionProcessor extends BaseProcessor {
         break
       case QUEUE_NAME.POSITION_PROCESSOR:
         targetQueue = this.positionQueue
+        break
+      case QUEUE_NAME.CLOSE_POSITION_PROCESSOR:
+        targetQueue = this.closePositionQueue
         break
       case QUEUE_NAME.COMPOSITION_FEES_PROCESSOR:
         targetQueue = this.compositionFeesQueue

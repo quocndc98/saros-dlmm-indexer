@@ -87,6 +87,13 @@ export interface CreatePositionArgs {
   relative_bin_in_right: number
 }
 
+export interface ClosePositionDecoded {
+  pair: string
+  position: string
+  positionMint: string
+  positionTokenAccount: string
+}
+
 export interface UiTokenAccount {
   mint: string
   owner: string

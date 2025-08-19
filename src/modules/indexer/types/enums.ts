@@ -26,7 +26,9 @@ export enum SwapType {
 
 export enum ProcessorName {
   CreatePositionProcessor = 'CreatePositionProcessor',
+  ClosePositionProcessor = 'ClosePositionProcessor',
   SwapProcessor = 'SwapProcessor',
   QuoteAssetProcessor = 'QuoteAssetProcessor',
   CompositionFeesProcessor = 'CompositionFeesProcessor',
+  DecreasePositionProcessor = 'DecreasePositionProcessor',
 }

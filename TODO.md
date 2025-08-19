@@ -23,18 +23,19 @@
 
 # List processor
 
-| Processor                         | Status | Handler             |
-| --------------------------------- | ------ | ------------------- |
-| initialize_bin_step_config        | done   | instruction         |
-| initialize_pair                   | done   | instruction         |
-| quote_asset                       | done   | event               |
-| initialize_bin_array              | done   | instruction         |
-| create_position                   |        | instruction + event |
-| close_position                    |        | instruction         |
-| increase_position                 |        | event               |
-| decrease_position                 |        | event               |
-| composition_fees                  | done   | event               |
-| dlq                               |        |                     |
-| swap                              | done   | instruction + event |
-| update_bin_step_config            |        |                     |
-| update_pair_static_fee_parameters |        |                     |
+| Processor                         | Status | Handler                |
+| --------------------------------- | ------ | ---------------------- |
+| initialize_bin_step_config        | done   | instruction            |
+| initialize_pair                   | done   | instruction            |
+| quote_asset                       | done   | event                  |
+| initialize_bin_array              | done   | instruction            |
+| create_position                   |        | instruction + event    |
+| close_position                    | done   | instruction (not test) |
+| increase_position                 |        | event                  |
+| decrease_position                 |        | event                  |
+| composition_fees                  | done   | event                  |
+| dlq                               |        |                        |
+| swap                              | done   | instruction + event    |
+| update_bin_step_config            |        |                        |
+| update_pair_static_fee_parameters |        |                        |
+

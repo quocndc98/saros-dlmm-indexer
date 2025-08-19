@@ -4,6 +4,7 @@ export const QUEUE_NAME = {
   INSTRUCTION_PROCESSOR: 'instruction-processor',
   SWAP_PROCESSOR: 'swap-processor',
   POSITION_PROCESSOR: 'position-processor',
+  CLOSE_POSITION_PROCESSOR: 'close-position-processor',
   COMPOSITION_FEES_PROCESSOR: 'composition-fees-processor',
   DLQ_PROCESSOR: 'dlq-processor',
   QUOTE_ASSET_PROCESSOR: 'quote-asset-processor',

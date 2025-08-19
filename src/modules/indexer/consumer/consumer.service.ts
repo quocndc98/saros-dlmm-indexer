@@ -9,6 +9,7 @@ import { QuoteAssetProcessor } from '../processors/quote-asset.processor'
 import { InitializePairProcessor } from '../processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from '../processors/initialize-bin-step-config.processor'
 import { InitializeBinArrayProcessor } from '../processors/initialize-bin-array.processor'
+import { ClosePositionProcessor } from '../processors/close-position.processor'
 import { QUEUE_NAME } from '../../queue/queue.constant'
 import { Logger } from '@/lib'
 import { Worker } from 'bullmq'
@@ -25,6 +26,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly transactionProcessor: TransactionProcessor,
     private readonly swapProcessor: SwapProcessor,
     private readonly positionProcessor: PositionProcessor,
+    private readonly closePositionProcessor: ClosePositionProcessor,
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
     private readonly initializePairProcessor: InitializePairProcessor,
     private readonly initializeBinStepConfigProcessor: InitializeBinStepConfigProcessor,
@@ -84,6 +86,16 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       }
     )
     this.workers.push(positionWorker)
+
+    const closePositionWorker = new Worker(
+      QUEUE_NAME.CLOSE_POSITION_PROCESSOR,
+      async (job) => await this.closePositionProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(closePositionWorker)
 
     // Composition fees processor worker
     const compositionFeesWorker = new Worker(

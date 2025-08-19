@@ -33,6 +33,7 @@ import { ScannerService } from './scanner/scanner.service'
 import { TransactionProcessor } from './processors/transaction.processor'
 import { SwapProcessor } from './processors/swap.processor'
 import { PositionProcessor } from './processors/position.processor'
+import { ClosePositionProcessor } from './processors/close-position.processor'
 import { CompositionFeesProcessor } from './processors/composition-fees.processor'
 import { InitializePairProcessor } from './processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from './processors/initialize-bin-step-config.processor'
@@ -90,6 +91,7 @@ import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shar
     TransactionProcessor,
     SwapProcessor,
     PositionProcessor,
+    ClosePositionProcessor,
     CompositionFeesProcessor,
     InitializePairProcessor,
     InitializeBinStepConfigProcessor,
