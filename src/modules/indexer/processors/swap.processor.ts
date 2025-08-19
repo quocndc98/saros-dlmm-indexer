@@ -6,7 +6,10 @@ import { PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
 import bs58 from 'bs58'
 import { BaseProcessor } from './base.processor'
 import { SwapEvent, SwapEventDocument } from '../schemas/swap-event.schema'
-import { BinSwapEvent as BinSwapEventSchema, BinSwapEventDocument } from '../schemas/bin-swap-event.schema'
+import {
+  BinSwapEvent as BinSwapEventSchema,
+  BinSwapEventDocument,
+} from '../schemas/bin-swap-event.schema'
 import { Bin, BinDocument } from '../schemas/bin.schema'
 import { Pair, PairDocument } from '../schemas/pair.schema'
 import { TokenMint, TokenMintDocument } from '../schemas/token-mint.schema'
@@ -17,7 +20,10 @@ import {
   EVENT_IDENTIFIER,
   BIN_SWAP_EVENT_DISCRIMINATOR,
 } from '../../../liquidity-book/liquidity-book.constant'
-import { BinSwapEvent as BinSwapEventDecoded, SwapArgs } from '../../../liquidity-book/liquidity-book.type'
+import {
+  BinSwapEvent as BinSwapEventDecoded,
+  SwapArgs,
+} from '../../../liquidity-book/liquidity-book.type'
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { ProcessorName, SwapType } from '../types/enums'
 import { InstructionService } from '../services/instruction.service'
@@ -199,12 +205,10 @@ export class SwapProcessor extends BaseProcessor {
           instructionIndex: instructionIndex,
         },
         {
-          $set: {
-            pairVaultIn: tokenVaultIn,
-            pairVaultOut: tokenVaultOut,
-            userVaultIn: userVaultIn,
-            userVaultOut: userVaultOut,
-          },
+          pairVaultIn: tokenVaultIn,
+          pairVaultOut: tokenVaultOut,
+          userVaultIn: userVaultIn,
+          userVaultOut: userVaultOut,
         },
       )
 
@@ -288,10 +292,8 @@ export class SwapProcessor extends BaseProcessor {
       await this.binModel.updateOne(
         { id: binId },
         {
-          $set: {
-            reserveX: newReserveX,
-            reserveY: newReserveY,
-          },
+          reserveX: newReserveX,
+          reserveY: newReserveY,
         },
       )
 
@@ -348,55 +350,29 @@ export class SwapProcessor extends BaseProcessor {
             pairVaultOut: 'dummy_pair_vault_out',
           }
 
-      // Calculate normalized amounts (matching Rust bin_math::normalize_amount)
-      const { amountInNormalized, amountOutNormalized, feeNormalized, protocolFeeNormalized } =
-        decoded.swap_for_y
-          ? {
-              amountInNormalized: BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintX.decimals),
-              amountOutNormalized: BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintY.decimals),
-              feeNormalized: BinMath.normalizeAmount(decoded.fee.toString(), tokenMintX.decimals),
-              protocolFeeNormalized: BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintX.decimals),
-            }
-          : {
-              amountInNormalized: BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintY.decimals),
-              amountOutNormalized: BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintX.decimals),
-              feeNormalized: BinMath.normalizeAmount(decoded.fee.toString(), tokenMintY.decimals),
-              protocolFeeNormalized: BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintY.decimals),
-            }
-
-      // Calculate USD and native amounts (matching Rust logic)
-      const amountInUsd = BinMath.multiply(
+      // Calculate normalized amounts and USD/native prices (matching Rust logic)
+      const {
         amountInNormalized,
-        decoded.swap_for_y ? priceXUsd : priceYUsd,
-      )
-      const amountInNative = BinMath.multiply(
-        amountInNormalized,
-        decoded.swap_for_y ? priceXNative : priceYNative,
-      )
-      const amountOutUsd = BinMath.multiply(
         amountOutNormalized,
-        decoded.swap_for_y ? priceYUsd : priceXUsd,
-      )
-      const amountOutNative = BinMath.multiply(
-        amountOutNormalized,
-        decoded.swap_for_y ? priceYNative : priceXNative,
-      )
-      const feeUsd = BinMath.multiply(
         feeNormalized,
-        decoded.swap_for_y ? priceXUsd : priceYUsd,
-      )
-      const feeNative = BinMath.multiply(
-        feeNormalized,
-        decoded.swap_for_y ? priceXNative : priceYNative,
-      )
-      const protocolFeeUsd = BinMath.multiply(
         protocolFeeNormalized,
-        decoded.swap_for_y ? priceXUsd : priceYUsd,
-      )
-      const protocolFeeNative = BinMath.multiply(
-        protocolFeeNormalized,
-        decoded.swap_for_y ? priceXNative : priceYNative,
-      )
+        amountInUsd,
+        amountInNative,
+        amountOutUsd,
+        amountOutNative,
+        feeUsd,
+        feeNative,
+        protocolFeeUsd,
+        protocolFeeNative,
+      } = this.calculateSwapAmounts({
+        decoded,
+        tokenMintX,
+        tokenMintY,
+        priceXUsd,
+        priceXNative,
+        priceYUsd,
+        priceYNative,
+      })
 
       // Create bin swap event record (matching Rust structure exactly)
       const binSwapEventId = this.getBinSwapEventId(
@@ -449,9 +425,7 @@ export class SwapProcessor extends BaseProcessor {
     }
   }
 
-  private decodeSwapInstruction(
-    instruction: PartiallyDecodedInstruction,
-  ): SwapDecoded | null {
+  private decodeSwapInstruction(instruction: PartiallyDecodedInstruction): SwapDecoded | null {
     try {
       const { idlIx, decodedIx } = LiquidityBookLibrary.decodeInstruction(instruction.data)
       const accounts = LiquidityBookLibrary.getAccountsByName(idlIx, instruction.accounts, [
@@ -510,4 +484,87 @@ export class SwapProcessor extends BaseProcessor {
     return `${blockNumber}-${signature}-${instructionIndex}-${innerIndexStr}-${binId}`
   }
 
+  /**
+   * Calculate normalized amounts and USD/native prices for swap
+   */
+  private calculateSwapAmounts(params: {
+    decoded: BinSwapEventDecoded
+    tokenMintX: TokenMint
+    tokenMintY: TokenMint
+    priceXUsd: string
+    priceXNative: string
+    priceYUsd: string
+    priceYNative: string
+  }): {
+    amountInNormalized: string
+    amountOutNormalized: string
+    feeNormalized: string
+    protocolFeeNormalized: string
+    amountInUsd: string
+    amountInNative: string
+    amountOutUsd: string
+    amountOutNative: string
+    feeUsd: string
+    feeNative: string
+    protocolFeeUsd: string
+    protocolFeeNative: string
+  } {
+    const { decoded, tokenMintX, tokenMintY, priceXUsd, priceXNative, priceYUsd, priceYNative } = params
+
+    let amountInNormalized: string
+    let amountOutNormalized: string
+    let feeNormalized: string
+    let protocolFeeNormalized: string
+    let priceInUsd: string
+    let priceInNative: string
+    let priceOutUsd: string
+    let priceOutNative: string
+
+    if (decoded.swap_for_y) {
+      // Swapping X -> Y
+      amountInNormalized = BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintX.decimals)
+      amountOutNormalized = BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintY.decimals)
+      feeNormalized = BinMath.normalizeAmount(decoded.fee.toString(), tokenMintX.decimals)
+      protocolFeeNormalized = BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintX.decimals)
+      priceInUsd = priceXUsd
+      priceInNative = priceXNative
+      priceOutUsd = priceYUsd
+      priceOutNative = priceYNative
+    } else {
+      // Swapping Y -> X
+      amountInNormalized = BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintY.decimals)
+      amountOutNormalized = BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintX.decimals)
+      feeNormalized = BinMath.normalizeAmount(decoded.fee.toString(), tokenMintY.decimals)
+      protocolFeeNormalized = BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintY.decimals)
+      priceInUsd = priceYUsd
+      priceInNative = priceYNative
+      priceOutUsd = priceXUsd
+      priceOutNative = priceXNative
+    }
+
+    // Calculate USD and native amounts using simple multiply
+    const amountInUsd = BinMath.multiply(amountInNormalized, priceInUsd)
+    const amountInNative = BinMath.multiply(amountInNormalized, priceInNative)
+    const amountOutUsd = BinMath.multiply(amountOutNormalized, priceOutUsd)
+    const amountOutNative = BinMath.multiply(amountOutNormalized, priceOutNative)
+    const feeUsd = BinMath.multiply(feeNormalized, priceInUsd)
+    const feeNative = BinMath.multiply(feeNormalized, priceInNative)
+    const protocolFeeUsd = BinMath.multiply(protocolFeeNormalized, priceInUsd)
+    const protocolFeeNative = BinMath.multiply(protocolFeeNormalized, priceInNative)
+
+    return {
+      amountInNormalized,
+      amountOutNormalized,
+      feeNormalized,
+      protocolFeeNormalized,
+      amountInUsd,
+      amountInNative,
+      amountOutUsd,
+      amountOutNative,
+      feeUsd,
+      feeNative,
+      protocolFeeUsd,
+      protocolFeeNative,
+    }
+  }
 }

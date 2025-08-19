@@ -65,7 +65,7 @@ export class InstructionService {
   /**
    * Insert instruction record to track processing
    */
-  async insertInstruction(params: InsertInstructionParams): Promise<Instruction> {
+  private async insertInstruction(params: InsertInstructionParams): Promise<Instruction> {
     try {
       const {
         instructionId,
@@ -89,7 +89,7 @@ export class InstructionService {
         blockTime: blockTime ? new Date(blockTime * 1000) : null,
       }
 
-      return await this.instructionModel.create(instructionData)
+      return this.instructionModel.create(instructionData)
     } catch (error) {
       throw new Error(`Error inserting instruction: ${error.message}`)
     }
