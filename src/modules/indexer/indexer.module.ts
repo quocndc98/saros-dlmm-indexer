@@ -56,12 +56,14 @@ import { IndexerController } from './controllers/indexer.controller'
 import { Instruction, InstructionSchema } from './schemas/instruction.schema'
 import { TokenAccount, TokenAccountSchema } from './schemas/token-account.schema'
 import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shares.schema'
+import { RabbitMQModule } from '../rabbitmq/rabbitmq.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ load: [indexerConfig] }),
     CacheModule,
     QueueModule,
+    RabbitMQModule,
     MongooseModule.forFeature([
       { name: TransactionEvent.name, schema: TransactionEventSchema },
       { name: SwapEvent.name, schema: SwapEventSchema },

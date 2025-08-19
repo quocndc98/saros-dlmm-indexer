@@ -6,6 +6,7 @@ import { AuthModule } from './modules/auth/auth.module'
 import { IndexerModule } from './modules/indexer/indexer.module'
 import { ScheduleModule } from '@nestjs/schedule'
 import { APP_GUARD } from '@nestjs/core'
+import { RabbitMQModule } from './modules/rabbitmq/rabbitmq.module'
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { APP_GUARD } from '@nestjs/core'
     LoggerModule,
     AuthModule,
     IndexerModule,
+    RabbitMQModule,
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
