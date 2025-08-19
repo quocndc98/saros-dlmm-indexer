@@ -1,40 +1,48 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
 
+export type PositionUpdateEventDocument = PositionUpdateEvent & Document
+
 @Schema({ timestamps: true })
-export class PositionUpdateEvent extends Document {
+export class PositionUpdateEvent {
+  @Prop({ required: true, unique: true })
+  id: string
+
+  @Prop({ required: true })
+  pairId: string
+
+  @Prop({ required: true })
+  positionId: string
+
+  @Prop({ required: true })
+  binId: string
+
+  @Prop({ required: true })
+  lbBinId: number
+
+  @Prop({ required: true })
+  deltaLiquidityBalance: string // BigDecimal as string
+
+  @Prop({ required: true })
+  deltaAmountX: string // BigDecimal as string
+
+  @Prop({ required: true })
+  deltaAmountY: string // BigDecimal as string
+
+  @Prop({ required: true })
+  blockNumber: number
+
   @Prop({ required: true })
   signature: string
 
   @Prop({ required: true })
-  slot: number
+  index: number // instruction_index
+
+  @Prop({ default: -1 })
+  innerIndex: number
 
   @Prop({ required: true })
   blockTime: Date
-
-  @Prop({ required: true })
-  positionMint: string
-
-  @Prop({ required: true })
-  pair: string
-
-  @Prop({ required: true })
-  user: string
-
-  @Prop({ required: true })
-  eventType: string // 'create', 'increase', 'decrease', 'close'
-
-  @Prop({ type: [Number], default: [] })
-  binIds: number[]
-
-  @Prop({ type: [String], default: [] })
-  amountsX: string[]
-
-  @Prop({ type: [String], default: [] })
-  amountsY: string[]
-
-  @Prop({ type: [String], default: [] })
-  liquidityShares: string[]
 }
 
 export const PositionUpdateEventSchema = SchemaFactory.createForClass(PositionUpdateEvent)

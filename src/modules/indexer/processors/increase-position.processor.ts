@@ -8,7 +8,6 @@ import { Pair } from '../schemas/pair.schema'
 import { Bin } from '../schemas/bin.schema'
 import { LiquidityShares } from '../schemas/liquidity-shares.schema'
 import { PositionUpdateEvent } from '../schemas/position-update-event.schema'
-import { Instruction } from '../schemas/instruction.schema'
 import { InstructionService } from '../services/instruction.service'
 import { ProcessorName } from '../types/enums'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
@@ -37,7 +36,6 @@ export class IncreasePositionProcessor extends BaseProcessor {
     @InjectModel(Bin.name) private readonly binModel: Model<Bin>,
     @InjectModel(LiquidityShares.name) private readonly liquiditySharesModel: Model<LiquidityShares>,
     @InjectModel(PositionUpdateEvent.name) private readonly positionUpdateEventModel: Model<PositionUpdateEvent>,
-    @InjectModel(Instruction.name) private readonly instructionModel: Model<Instruction>,
     private readonly instructionService: InstructionService,
   ) {
     super(IncreasePositionProcessor.name)
@@ -140,7 +138,7 @@ export class IncreasePositionProcessor extends BaseProcessor {
     instructionIndex: number,
     innerInstructionIndex: number | null,
     blockNumber: number,
-    blockTime: Date | null,
+    blockTime: number | null,
   ): Promise<void> {
     try {
       this.logger.debug(`Checking if pair ${decoded.pair} exists...`)
@@ -215,7 +213,6 @@ export class IncreasePositionProcessor extends BaseProcessor {
         totalAmountX += decoded.amounts_x[index]
         totalAmountY += decoded.amounts_y[index]
 
-        // Insert position update event (matching Rust position_update_event_crud logic)
         const eventId = `${instructionId}-${lbBinId}`
         await this.positionUpdateEventModel.create({
           id: eventId,
@@ -224,13 +221,13 @@ export class IncreasePositionProcessor extends BaseProcessor {
           positionId: decoded.position,
           binId: binId,
           lbBinId: lbBinId,
+          deltaLiquidityBalance: decoded.liquidity_minted[index].toString(),
+          deltaAmountX: decoded.amounts_x[index].toString(),
+          deltaAmountY: decoded.amounts_y[index].toString(),
+          index: instructionIndex,
+          innerIndex: innerInstructionIndex,
           blockNumber: blockNumber,
-          liquidityShare: decoded.liquidity_minted[index].toString(),
-          amountX: decoded.amounts_x[index].toString(),
-          amountY: decoded.amounts_y[index].toString(),
-          blockTime: blockTime,
-          instructionIndex: instructionIndex,
-          innerInstructionIndex: innerInstructionIndex,
+          blockTime: blockTime ? new Date(blockTime * 1000) : new Date(),
         })
       }
 

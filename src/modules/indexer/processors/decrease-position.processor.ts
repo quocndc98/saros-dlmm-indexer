@@ -169,7 +169,7 @@ export class DecreasePositionProcessor extends BaseProcessor {
     instructionIndex: number,
     innerInstructionIndex: number | null,
     blockNumber: number,
-    blockTime: Date | null,
+    blockTime: number | null,
   ): Promise<void> {
     try {
       // Check if pair exists (matching Rust logic exactly)
@@ -253,7 +253,7 @@ export class DecreasePositionProcessor extends BaseProcessor {
         totalAmountX += decoded.amounts_x[index]
         totalAmountY += decoded.amounts_y[index]
 
-        // Insert position update event with negative values (matching Rust position_update_event_crud logic)
+        // Insert position update event with negative values (matching Rust position_update_event_crud logic exactly)
         const eventId = `${instructionId}-${lbBinId}`
         await this.positionUpdateEventModel.create({
           id: eventId,
@@ -262,13 +262,13 @@ export class DecreasePositionProcessor extends BaseProcessor {
           positionId: decoded.position,
           binId: binId,
           lbBinId: lbBinId,
+          deltaLiquidityBalance: (-decoded.liquidity_burned[index]).toString(), // Negative for decrease
+          deltaAmountX: (-decoded.amounts_x[index]).toString(), // Negative for decrease
+          deltaAmountY: (-decoded.amounts_y[index]).toString(), // Negative for decrease
+          index: instructionIndex,
+          innerIndex: innerInstructionIndex,
           blockNumber,
-          liquidityShare: (-decoded.liquidity_burned[index]).toString(), // Negative for decrease
-          amountX: (-decoded.amounts_x[index]).toString(), // Negative for decrease
-          amountY: (-decoded.amounts_y[index]).toString(), // Negative for decrease
-          blockTime: blockTime,
-          instructionIndex: instructionIndex,
-          innerInstructionIndex: innerInstructionIndex,
+          blockTime: blockTime ? new Date(blockTime * 1000) : new Date(),
         })
       }
 
