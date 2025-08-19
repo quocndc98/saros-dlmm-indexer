@@ -3,7 +3,6 @@ import { BN, BorshCoder } from '@coral-xyz/anchor'
 import { LiquidityBookIdl } from './liquidity-book.idl'
 import { PublicKey, Connection } from '@solana/web3.js'
 import { IdlInstruction } from '@coral-xyz/anchor/dist/cjs/idl'
-import { LIQUIDITY_BOOK_PROGRAM_ID } from './liquidity-book.constants'
 import { BinArray, IdlAccountName, Pair, Position } from './liquidity-book.type'
 
 export const coder = new BorshCoder(LiquidityBookIdl)

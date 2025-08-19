@@ -1,3 +1,5 @@
+export const LIQUIDITY_BOOK_PROGRAM_ID = process.env.LIQUIDITY_BOOK_PROGRAM_ADDRESS
+
 export const INSTRUCTION_NAMES = {
   SWAP: 'swap',
   CREATE_POSITION: 'create_position',
@@ -32,17 +34,6 @@ export const TYPE_NAMES = {
   QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
   POSITION_CREATION_EVENT: 'PositionCreationEvent',
 } as const
-
-export const MDMA_HOOK_INSTRUCTION_NAMES = {
-  initialize_config: 'initialize_config',
-}
-
-export const TRANSACTION_TYPE = {
-  CREATE_POOL: 'CREATE_POOL',
-  ADD_LIQUIDITY: 'ADD_LIQUIDITY',
-  REMOVE_LIQUIDITY: 'REMOVE_LIQUIDITY',
-  SWAP: 'SWAP',
-}
 
 export const BIN_ARRAY_SIZE = 256
 

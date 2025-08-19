@@ -1,5 +1,5 @@
 import { Idl } from '@coral-xyz/anchor'
-import { LIQUIDITY_BOOK_PROGRAM_ID } from './liquidity-book.constants'
+import { LIQUIDITY_BOOK_PROGRAM_ID } from './liquidity-book.constant'
 
 export const LiquidityBookIdl: Idl = {
   address: LIQUIDITY_BOOK_PROGRAM_ID,
