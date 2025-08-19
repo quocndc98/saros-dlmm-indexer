@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  mongo1: # Mongo replica set with single node to test transactions
+    image: mongo:8.0
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    ports:
+      - 37017:27017
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'host.docker.internal:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      start_interval: 1s
+      retries: 30
+    volumes:
+      - ./data/mongo/mongo1/db:/data/db
+      - ./data/mongo/mongo1/configdb:/data/configdb
