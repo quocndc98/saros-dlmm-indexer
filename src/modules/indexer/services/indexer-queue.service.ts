@@ -13,8 +13,8 @@ export class IndexerQueueService {
     private readonly transactionQueue: Queue,
     @InjectQueue(QUEUE_NAME.SWAP_PROCESSOR)
     private readonly swapQueue: Queue,
-    @InjectQueue(QUEUE_NAME.POSITION_PROCESSOR)
-    private readonly positionQueue: Queue,
+    @InjectQueue(QUEUE_NAME.CREATE_POSITION_PROCESSOR)
+    private readonly createPositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR)
     private readonly compositionFeesQueue: Queue,
     @InjectQueue(QUEUE_NAME.DLQ_PROCESSOR)
@@ -29,8 +29,8 @@ export class IndexerQueueService {
         return this.transactionQueue
       case QUEUE_NAME.SWAP_PROCESSOR:
         return this.swapQueue
-      case QUEUE_NAME.POSITION_PROCESSOR:
-        return this.positionQueue
+      case QUEUE_NAME.CREATE_POSITION_PROCESSOR:
+        return this.createPositionQueue
       case QUEUE_NAME.COMPOSITION_FEES_PROCESSOR:
         return this.compositionFeesQueue
       case QUEUE_NAME.DLQ_PROCESSOR:

@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Job } from 'bullmq'
-import { PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
+import { PartiallyDecodedInstruction } from '@solana/web3.js'
 import { BaseProcessor } from './base.processor'
 import { Position } from '../schemas/position.schema'
-import { PositionUpdateEvent } from '../schemas/position-update-event.schema'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { SolanaService } from '../services/solana.service'
 import { EVENT_DISCRIMINATOR_POSITION_CREATE, EVENT_IDENTIFIER_POSITION_CREATE, INSTRUCTION_IDENTIFIER_POSITION_CREATE, JOB_TYPES, MAX_BIN_PER_POSITION_CREATE } from '../constants/indexer.constants'
@@ -18,12 +17,10 @@ import { LiquidityShares } from '../schemas/liquidity-shares.schema'
 import { TYPE_NAMES } from '@/liquidity-book/liquidity-book.constant'
 
 @Injectable()
-export class PositionProcessor extends BaseProcessor {
+export class CreatePositionProcessor extends BaseProcessor {
   constructor(
     @InjectModel(Position.name)
     private readonly positionModel: Model<Position>,
-    @InjectModel(PositionUpdateEvent.name)
-    private readonly positionUpdateEventModel: Model<PositionUpdateEvent>,
     @InjectModel(Instruction.name)
     private readonly instructionModel: Model<Instruction>,
     @InjectModel(TokenAccount.name)
@@ -32,21 +29,13 @@ export class PositionProcessor extends BaseProcessor {
     private readonly liquiditySharesModel: Model<LiquidityShares>,
     private readonly solanaService: SolanaService,
   ) {
-    super(PositionProcessor.name)
+    super(CreatePositionProcessor.name)
   }
 
   async process(job: Job): Promise<void> {
     this.logJobStart(job)
     try {
-      const jobType = job.name
-      switch (jobType) {
-        case JOB_TYPES.PROCESS_POSITION_CREATE :
-          await this.processCreatePosition(job.data)
-          break
-        default:
-          this.logger.warn(`Unknown position instruction: ${jobType}`)
-      }
-
+      await this.processCreatePosition(job.data)
       this.logJobComplete(job)
     } catch (error) {
       await this.handleError(error, `processing position instruction ${job.data.instructionName}`)

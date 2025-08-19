@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Inject } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config'
 import { TransactionProcessor } from '../processors/transaction.processor'
 import { SwapProcessor } from '../processors/swap.processor'
-import { PositionProcessor } from '../processors/position.processor'
+import { CreatePositionProcessor } from '../processors/create-position.processor'
 import { CompositionFeesProcessor } from '../processors/composition-fees.processor'
 import { DlqProcessor } from '../processors/dlq.processor'
 import { QuoteAssetProcessor } from '../processors/quote-asset.processor'
@@ -26,8 +26,8 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly transactionProcessor: TransactionProcessor,
     private readonly swapProcessor: SwapProcessor,
-    private readonly positionProcessor: PositionProcessor,
     private readonly increasePositionProcessor: IncreasePositionProcessor,
+    private readonly createPositionProcessor: CreatePositionProcessor,
     private readonly closePositionProcessor: ClosePositionProcessor,
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
     private readonly initializePairProcessor: InitializePairProcessor,
@@ -78,16 +78,16 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     )
     this.workers.push(swapWorker)
 
-    // Position processor worker
-    const positionWorker = new Worker(
-      QUEUE_NAME.POSITION_PROCESSOR,
-      async (job) => await this.positionProcessor.process(job),
+    // Create position processor worker
+    const createPositionWorker = new Worker(
+      QUEUE_NAME.CREATE_POSITION_PROCESSOR,
+      async (job) => await this.createPositionProcessor.process(job),
       {
         connection: redisConnection,
         concurrency: 3
       }
     )
-    this.workers.push(positionWorker)
+    this.workers.push(createPositionWorker)
 
     const increasePositionWorker = new Worker(
       QUEUE_NAME.INCREASE_POSITION_PROCESSOR,

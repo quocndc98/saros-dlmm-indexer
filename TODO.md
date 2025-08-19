@@ -29,7 +29,7 @@
 | initialize_pair                   | done   | instruction            |
 | quote_asset                       | done   | event                  |
 | initialize_bin_array              | done   | instruction            |
-| create_position                   |        | instruction + event    |
+| create_position                   | done   | instruction + event    |
 | close_position                    | done   | instruction (not test) |
 | increase_position                 |        | event                  |
 | decrease_position                 |        | event                  |
