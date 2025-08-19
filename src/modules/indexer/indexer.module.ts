@@ -35,6 +35,7 @@ import { SwapProcessor } from './processors/swap.processor'
 import { CreatePositionProcessor } from './processors/create-position.processor'
 import { ClosePositionProcessor } from './processors/close-position.processor'
 import { IncreasePositionProcessor } from './processors/increase-position.processor'
+import { DecreasePositionProcessor } from './processors/decrease-position.processor'
 import { CompositionFeesProcessor } from './processors/composition-fees.processor'
 import { InitializePairProcessor } from './processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from './processors/initialize-bin-step-config.processor'
@@ -94,6 +95,7 @@ import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shar
     CreatePositionProcessor,
     ClosePositionProcessor,
     IncreasePositionProcessor,
+    DecreasePositionProcessor,
     CompositionFeesProcessor,
     InitializePairProcessor,
     InitializeBinStepConfigProcessor,
