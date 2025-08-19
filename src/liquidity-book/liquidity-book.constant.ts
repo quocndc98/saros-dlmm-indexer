@@ -17,6 +17,7 @@ export const EVENT_NAMES = {
   QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
   QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
   POSITION_CREATION_EVENT: 'PositionCreationEvent',
+  POSITION_INCREASE_EVENT: 'PositionIncreaseEvent',
 } as const
 
 export const TYPE_NAMES = {

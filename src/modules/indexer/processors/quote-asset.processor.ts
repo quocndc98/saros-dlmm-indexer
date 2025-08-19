@@ -13,11 +13,10 @@ import {
   QuoteAssetBadgeUpdateEvent,
 } from '../../../liquidity-book/liquidity-book.type'
 import { ProcessorName, QuoteAssetStatus, QuoteAssetType } from '../types/enums'
-import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
+import { EVENT_IDENTIFIER, TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { InstructionService } from '../services/instruction.service'
 
 // Constants from Rust
-const EVENT_IDENTIFIER = Buffer.from([228, 69, 165, 46, 81, 203, 154, 29])
 const QUOTE_ASSET_INIT_EVENT_DISCRIMINATOR = Buffer.from([202, 110, 93, 186, 165, 96, 200, 27])
 const QUOTE_ASSET_UPDATE_EVENT_DISCRIMINATOR = Buffer.from([102, 149, 171, 236, 123, 73, 205, 194])
 
@@ -49,7 +48,7 @@ export class QuoteAssetProcessor extends BaseProcessor {
       const [identifier, data] = splitAt(decodedData, 8)
 
       // Only use event instructions
-      if (!identifier.equals(EVENT_IDENTIFIER)) {
+      if (!identifier.equals(Buffer.from(EVENT_IDENTIFIER))) {
         this.logger.warn('Not an event instruction')
         return
       }

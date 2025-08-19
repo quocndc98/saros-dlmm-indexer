@@ -21,6 +21,7 @@ export class TransactionProcessor extends BaseProcessor {
     private readonly transactionParserService: TransactionParserService,
     @InjectQueue(QUEUE_NAME.SWAP_PROCESSOR) private readonly swapQueue: Queue,
     @InjectQueue(QUEUE_NAME.POSITION_PROCESSOR) private readonly positionQueue: Queue,
+    @InjectQueue(QUEUE_NAME.INCREASE_POSITION_PROCESSOR) private readonly increasePositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.CLOSE_POSITION_PROCESSOR) private readonly closePositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR)
     private readonly compositionFeesQueue: Queue,
@@ -175,6 +176,11 @@ export class TransactionProcessor extends BaseProcessor {
             queueName: QUEUE_NAME.POSITION_PROCESSOR,
             jobType: JOB_TYPES.PROCESS_POSITION_CREATE
           }
+        case EVENT_NAMES.POSITION_INCREASE_EVENT:
+          return {
+            queueName: QUEUE_NAME.INCREASE_POSITION_PROCESSOR,
+            jobType: JOB_TYPES.PROCESS_POSITION_INCREASE
+          }
         default:
           this.logger.warn(`Unknown event: ${eventName}`)
           return null
@@ -192,8 +198,8 @@ export class TransactionProcessor extends BaseProcessor {
         return { queueName: QUEUE_NAME.SWAP_PROCESSOR, jobType: JOB_TYPES.PROCESS_SWAP }
       case INSTRUCTION_NAMES.CREATE_POSITION:
         return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CREATE }
-      case INSTRUCTION_NAMES.INCREASE_POSITION:
-        return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_INCREASE }
+      // case INSTRUCTION_NAMES.INCREASE_POSITION:
+      //   return { queueName: QUEUE_NAME.INCREASE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_INCREASE }
       case INSTRUCTION_NAMES.DECREASE_POSITION:
         return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_DECREASE }
       case INSTRUCTION_NAMES.CLOSE_POSITION:
@@ -223,6 +229,9 @@ export class TransactionProcessor extends BaseProcessor {
         break
       case QUEUE_NAME.POSITION_PROCESSOR:
         targetQueue = this.positionQueue
+        break
+      case QUEUE_NAME.INCREASE_POSITION_PROCESSOR:
+        targetQueue = this.increasePositionQueue
         break
       case QUEUE_NAME.CLOSE_POSITION_PROCESSOR:
         targetQueue = this.closePositionQueue

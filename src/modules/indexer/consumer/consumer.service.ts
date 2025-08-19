@@ -9,6 +9,7 @@ import { QuoteAssetProcessor } from '../processors/quote-asset.processor'
 import { InitializePairProcessor } from '../processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from '../processors/initialize-bin-step-config.processor'
 import { InitializeBinArrayProcessor } from '../processors/initialize-bin-array.processor'
+import { IncreasePositionProcessor } from '../processors/increase-position.processor'
 import { ClosePositionProcessor } from '../processors/close-position.processor'
 import { QUEUE_NAME } from '../../queue/queue.constant'
 import { Logger } from '@/lib'
@@ -26,6 +27,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly transactionProcessor: TransactionProcessor,
     private readonly swapProcessor: SwapProcessor,
     private readonly positionProcessor: PositionProcessor,
+    private readonly increasePositionProcessor: IncreasePositionProcessor,
     private readonly closePositionProcessor: ClosePositionProcessor,
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
     private readonly initializePairProcessor: InitializePairProcessor,
@@ -86,6 +88,16 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       }
     )
     this.workers.push(positionWorker)
+
+    const increasePositionWorker = new Worker(
+      QUEUE_NAME.INCREASE_POSITION_PROCESSOR,
+      async (job) => await this.increasePositionProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(increasePositionWorker)
 
     const closePositionWorker = new Worker(
       QUEUE_NAME.CLOSE_POSITION_PROCESSOR,
