@@ -19,7 +19,5 @@ export const INSTRUCTION_NAMES = {
 
 // Position Create
 export const INSTRUCTION_IDENTIFIER_POSITION_CREATE = Buffer.from([48, 215, 197, 153, 96, 203, 180, 133])
-export const EVENT_IDENTIFIER_POSITION_CREATE = Buffer.from([228, 69, 165, 46, 81, 203, 154, 29])
 export const EVENT_DISCRIMINATOR_POSITION_CREATE = Buffer.from([97, 21, 205, 201, 62, 41, 111, 164])
-export const MAX_BIN_PER_POSITION_CREATE = 64
 export const BIN_PER_POSITION = 64

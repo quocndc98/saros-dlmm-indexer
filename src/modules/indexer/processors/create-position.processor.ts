@@ -7,14 +7,26 @@ import { BaseProcessor } from './base.processor'
 import { Position } from '../schemas/position.schema'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { SolanaService } from '../services/solana.service'
-import { EVENT_DISCRIMINATOR_POSITION_CREATE, EVENT_IDENTIFIER_POSITION_CREATE, INSTRUCTION_IDENTIFIER_POSITION_CREATE, JOB_TYPES, MAX_BIN_PER_POSITION_CREATE } from '../constants/indexer.constants'
-import { CreatePositionArgs, CreatePositionDecoded, ParsedInstructionMessage, PositionCreationEvent, PositionCreationEventDecoded } from '../types/indexer.types'
+import {
+  BIN_PER_POSITION,
+  EVENT_DISCRIMINATOR_POSITION_CREATE,
+  INSTRUCTION_IDENTIFIER_POSITION_CREATE,
+} from '../constants/indexer.constants'
+import {
+  CreatePositionArgs,
+  CreatePositionDecoded,
+  ParsedInstructionMessage,
+  PositionCreationEvent,
+  PositionCreationEventDecoded,
+} from '../types/indexer.types'
 import bs58 from 'bs58'
 import { Instruction } from '../schemas/instruction.schema'
 import { ProcessorName } from '../types/enums'
 import { TokenAccount } from '../schemas/token-account.schema'
 import { LiquidityShares } from '../schemas/liquidity-shares.schema'
-import { TYPE_NAMES } from '@/liquidity-book/liquidity-book.constant'
+import { EVENT_IDENTIFIER, TYPE_NAMES } from '@/liquidity-book/liquidity-book.constant'
+import { InstructionService } from '../services/instruction.service'
+import { splitAt } from '@/utils/helper'
 
 @Injectable()
 export class CreatePositionProcessor extends BaseProcessor {
@@ -28,6 +40,7 @@ export class CreatePositionProcessor extends BaseProcessor {
     @InjectModel(LiquidityShares.name)
     private readonly liquiditySharesModel: Model<LiquidityShares>,
     private readonly solanaService: SolanaService,
+    private readonly instructionService: InstructionService,
   ) {
     super(CreatePositionProcessor.name)
   }
@@ -42,33 +55,56 @@ export class CreatePositionProcessor extends BaseProcessor {
     }
   }
 
-  async processCreatePosition(input:  ParsedInstructionMessage ) {
-    const { block_number, transaction_signature, instruction, instruction_index, inner_instruction_index, is_inner, block_time } = input
-    const decodedData = this.decodeInstructionData(instruction.data)
-    if (!decodedData) {
-        return false
-    }
+  async processCreatePosition(input: ParsedInstructionMessage) {
+    const {
+      block_number,
+      transaction_signature,
+      instruction,
+      instruction_index,
+      inner_instruction_index,
+      is_inner,
+      block_time,
+    } = input
 
-    const [identifier, instructionData] = this.splitAt(decodedData, 8)
+    const decodedData = Buffer.from(bs58.decode(instruction.data))
+    const [identifier, data] = splitAt(decodedData, 8)
+
     if (identifier.equals(INSTRUCTION_IDENTIFIER_POSITION_CREATE)) {
-      return await this.processInstructionPath(instruction, block_number, instruction_index, inner_instruction_index, transaction_signature, is_inner, block_time)
+      return this.processInstruction(
+        instruction,
+        block_number,
+        instruction_index,
+        inner_instruction_index,
+        transaction_signature,
+        is_inner,
+        block_time,
+      )
     }
 
-    if (identifier.equals(EVENT_IDENTIFIER_POSITION_CREATE)) {
-      return await this.processEventPath(instructionData, block_number, instruction_index, inner_instruction_index, transaction_signature, is_inner, block_time)
+    if (identifier.equals(Buffer.from(EVENT_IDENTIFIER))) {
+      const [discriminator, eventData] = splitAt(data, 8)
+      if (discriminator.equals(EVENT_DISCRIMINATOR_POSITION_CREATE)) {
+        return this.processEvent(
+          eventData,
+          block_number,
+          instruction_index,
+          inner_instruction_index,
+          transaction_signature,
+          is_inner,
+          block_time,
+        )
+      }
     }
-
-    return false
   }
 
-  private async processInstructionPath(
+  private async processInstruction(
     instruction: PartiallyDecodedInstruction,
     blockNumber: number,
     instructionIndex: number,
     innerInstructionIndex: number | null,
     txnSignature: string,
     isInner: boolean,
-    blockTime: number | null
+    blockTime: number | null,
   ): Promise<boolean> {
     try {
       // Decode instruction (matching Rust decode_instruction)
@@ -79,17 +115,17 @@ export class CreatePositionProcessor extends BaseProcessor {
 
       // On-chain call to get owner of position (matching Rust logic exactly)
       const positionTokenAccount = await this.solanaService.getTokenAccount(
-        decodedPosition.positionTokenAccount
+        decodedPosition.positionTokenAccount,
       )
 
       let positionTokenAccountOwner: string
       if (!positionTokenAccount) {
         const accountCreator = await this.solanaService.getAccountCreator(
-          decodedPosition.positionTokenAccount
+          decodedPosition.positionTokenAccount,
         )
         if (!accountCreator) {
           throw new Error(
-            `Failed to get position account creator ${decodedPosition.positionTokenAccount}`
+            `Failed to get position account creator ${decodedPosition.positionTokenAccount}`,
           )
         }
         positionTokenAccountOwner = accountCreator
@@ -98,34 +134,26 @@ export class CreatePositionProcessor extends BaseProcessor {
       }
 
       // Check if instruction already processed (matching Rust logic)
-      const instructionId = this.getInstructionId(
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
         blockNumber,
-        txnSignature,
-        ProcessorName.CreatePositionProcessor,
-        instructionIndex,
-        innerInstructionIndex
-      )
-
-      const existingInstruction = await this.instructionModel.findOne({ id: instructionId })
-      if (existingInstruction) {
-        return true // Already processed
-      }
-
-      // Insert instruction record (matching Rust instruction tracking)
-      await this.instructionModel.create({
-        id: instructionId,
-        processorName: ProcessorName.CreatePositionProcessor,
         signature: txnSignature,
-        index: instructionIndex,
-        innerIndex: innerInstructionIndex,
+        processorName: ProcessorName.CreatePositionProcessor,
+        instructionIndex,
+        innerInstructionIndex,
         isInner,
-        blockNumber,
-        blockTime: blockTime ? new Date(blockTime * 1000) : null,
+        blockTime,
       })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(
+          `Create position instruction already processed for signature: ${txnSignature}`,
+        )
+        return true
+      }
 
       // Check for existing position token account (matching Rust logic)
       const existingTokenAccount = await this.tokenAccountModel.findOne({
-        id: decodedPosition.positionTokenAccount
+        id: decodedPosition.positionTokenAccount,
       })
 
       if (!existingTokenAccount) {
@@ -139,13 +167,17 @@ export class CreatePositionProcessor extends BaseProcessor {
 
       // Check if position already exists and update or insert (matching Rust match statement)
       const existingPosition = await this.positionModel.findOne({
-        id: decodedPosition.position
+        id: decodedPosition.position,
       })
 
       if (!existingPosition) {
         // Create liquidity shares (matching Rust loop: for liquidity_share_index in 0..=MAX_BIN_PER_POSITION - 1)
         const liquiditySharesData = []
-        for (let liquidityShareIndex = 0; liquidityShareIndex < MAX_BIN_PER_POSITION_CREATE; liquidityShareIndex++) {
+        for (
+          let liquidityShareIndex = 0;
+          liquidityShareIndex < BIN_PER_POSITION;
+          liquidityShareIndex++
+        ) {
           liquiditySharesData.push({
             id: `${decodedPosition.position}-${liquidityShareIndex}`,
             positionId: decodedPosition.position,
@@ -173,7 +205,7 @@ export class CreatePositionProcessor extends BaseProcessor {
           {
             positionMintId: decodedPosition.positionMint,
             ownerId: positionTokenAccountOwner,
-          }
+          },
         )
 
         this.logger.log(`Updated existing position: ${decodedPosition.position}`)
@@ -186,22 +218,16 @@ export class CreatePositionProcessor extends BaseProcessor {
     }
   }
 
-  private async processEventPath(
-    instructionDataBuffer: Buffer<ArrayBufferLike>,
+  private async processEvent(
+    eventData: Buffer,
     blockNumber: number,
     instructionIndex: number,
     innerInstructionIndex: number | null,
     txnSignature: string,
     isInner: boolean,
-    blockTime: number | null
+    blockTime: number | null,
   ): Promise<boolean> {
     try {
-      const [discriminator, eventData] = this.splitAt(instructionDataBuffer, 8)
-      if (!discriminator.equals(EVENT_DISCRIMINATOR_POSITION_CREATE)) {
-        this.logger.debug('Event discriminator does not match PositionCreationEvent')
-        return false
-      }
-
       // Decode position creation event data
       const decodedEvent = this.decodePositionCreationEvent(eventData)
       if (!decodedEvent) {
@@ -211,41 +237,34 @@ export class CreatePositionProcessor extends BaseProcessor {
       this.logger.log(`Processing position creation event for position: ${decodedEvent.position}`)
 
       // Check if instruction already processed (matching Rust logic)
-      const instructionId = this.getInstructionId(
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
         blockNumber,
-        txnSignature,
-        ProcessorName.CreatePositionProcessor,
-        instructionIndex,
-        innerInstructionIndex
-      )
-
-      const existingInstruction = await this.instructionModel.findOne({ id: instructionId })
-      if (existingInstruction) {
-        this.logger.log(`Event already processed: ${instructionId}`)
-        return true // Already processed
-      }
-
-      // Insert instruction record (matching Rust instruction tracking)
-      await this.instructionModel.create({
-        id: instructionId,
-        processorName: ProcessorName.CreatePositionProcessor,
         signature: txnSignature,
-        index: instructionIndex,
-        innerIndex: innerInstructionIndex,
+        processorName: ProcessorName.CreatePositionProcessor,
+        instructionIndex,
+        innerInstructionIndex,
         isInner,
-        blockNumber,
-        blockTime: blockTime ? new Date(blockTime * 1000) : null,
+        blockTime,
       })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(`Position creation event already processed for signature: ${txnSignature}`)
+        return true
+      }
 
       const positionId = decodedEvent.position
 
       // Check if position already exists and update or insert (matching Rust match statement)
-      const existingPosition = await this.positionModel.findOne({ id: positionId })
+      const existingPosition = await this.positionModel.findOne({ id: positionId }).lean()
 
       if (!existingPosition) {
         // Create liquidity shares (matching Rust loop)
         const liquiditySharesData = []
-        for (let liquidityShareIndex = 0; liquidityShareIndex < MAX_BIN_PER_POSITION_CREATE; liquidityShareIndex++) {
+        for (
+          let liquidityShareIndex = 0;
+          liquidityShareIndex < BIN_PER_POSITION;
+          liquidityShareIndex++
+        ) {
           liquiditySharesData.push({
             id: `${positionId}-${liquidityShareIndex}`,
             positionId: positionId,
@@ -256,7 +275,7 @@ export class CreatePositionProcessor extends BaseProcessor {
           })
         }
         await this.liquiditySharesModel.insertMany(liquiditySharesData)
-        this.logger.log(`Created ${MAX_BIN_PER_POSITION_CREATE} liquidity shares for position: ${positionId}`)
+        this.logger.log(`Created ${BIN_PER_POSITION} liquidity shares for position: ${positionId}`)
 
         // Create position record (matching Rust position::ActiveModel for event)
         await this.positionModel.create({
@@ -276,7 +295,7 @@ export class CreatePositionProcessor extends BaseProcessor {
           {
             lowerBinLbId: decodedEvent.lowerBinId,
             upperBinLbId: decodedEvent.upperBinId,
-          }
+          },
         )
 
         this.logger.log(`Updated position bin range: ${positionId}`)
@@ -289,19 +308,17 @@ export class CreatePositionProcessor extends BaseProcessor {
     }
   }
 
-  private decodeInstruction(instruction: PartiallyDecodedInstruction): CreatePositionDecoded | null {
+  private decodeInstruction(
+    instruction: PartiallyDecodedInstruction,
+  ): CreatePositionDecoded | null {
     try {
       const { idlIx, decodedIx } = LiquidityBookLibrary.decodeInstruction(instruction.data)
-      const accounts = LiquidityBookLibrary.getAccountsByName(
-        idlIx,
-        instruction.accounts,
-        [
-          'pair',
-          'position',
-          'position_mint',
-          'position_token_account'
-        ],
-      )
+      const accounts = LiquidityBookLibrary.getAccountsByName(idlIx, instruction.accounts, [
+        'pair',
+        'position',
+        'position_mint',
+        'position_token_account',
+      ])
 
       const positionArgs = decodedIx.data as CreatePositionArgs
       const dataDecode: CreatePositionDecoded = {
@@ -320,13 +337,15 @@ export class CreatePositionProcessor extends BaseProcessor {
     }
   }
 
-  private decodePositionCreationEvent(eventData: Buffer<ArrayBufferLike>): PositionCreationEvent | null {
+  private decodePositionCreationEvent(
+    eventData: Buffer<ArrayBufferLike>,
+  ): PositionCreationEvent | null {
     try {
       const decoded = LiquidityBookLibrary.decodeType<PositionCreationEventDecoded>(
         TYPE_NAMES.POSITION_CREATION_EVENT,
         eventData,
       )
-      
+
       return {
         pair: decoded.pair?.toString(),
         position: decoded.position?.toString(),
@@ -338,28 +357,5 @@ export class CreatePositionProcessor extends BaseProcessor {
       this.logger.warn(`Failed to decode PositionCreationEvent: ${error}`)
       return null
     }
-  }
-
-  private decodeInstructionData(data: string): Buffer | null {
-    try {
-      return Buffer.from(bs58.decode(data))
-    } catch (error) {
-      this.logger.error('Error decoding instruction data:', error)
-      return null
-    }
-  }
-
-  private splitAt(buffer: Buffer, index: number): [Buffer, Buffer] {
-    return [buffer.subarray(0, index), buffer.subarray(index)]
-  }
-  private getInstructionId(
-    blockNumber: number,
-    txnSignature: string,
-    processorName: string,
-    instructionIndex: number,
-    innerInstructionIndex: number | null
-  ): string {
-    const innerIndexStr = innerInstructionIndex ? innerInstructionIndex.toString() : '*'
-    return `${blockNumber}-${txnSignature}-${processorName.toLowerCase()}-${instructionIndex}-${innerIndexStr}`
   }
 }
