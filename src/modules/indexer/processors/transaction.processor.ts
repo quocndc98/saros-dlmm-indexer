@@ -20,6 +20,8 @@ export class TransactionProcessor extends BaseProcessor {
     private readonly solanaService: SolanaService,
     private readonly transactionParserService: TransactionParserService,
     @InjectQueue(QUEUE_NAME.SWAP_PROCESSOR) private readonly swapQueue: Queue,
+    @InjectQueue(QUEUE_NAME.INCREASE_POSITION_PROCESSOR) private readonly increasePositionQueue: Queue,
+    @InjectQueue(QUEUE_NAME.DECREASE_POSITION_PROCESSOR) private readonly decreasePositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.CREATE_POSITION_PROCESSOR) private readonly createPositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.CLOSE_POSITION_PROCESSOR) private readonly closePositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR)
@@ -30,6 +32,7 @@ export class TransactionProcessor extends BaseProcessor {
     @InjectQueue(QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR)
     private readonly initializeBinArrayQueue: Queue,
     @InjectQueue(QUEUE_NAME.QUOTE_ASSET_PROCESSOR) private readonly quoteAssetQueue: Queue,
+    @InjectQueue(QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR) private readonly updatePairStaticFeeParametersQueue: Queue,
     @InjectQueue(QUEUE_NAME.DLQ_PROCESSOR) private readonly dlqQueue: Queue,
     @InjectModel(TransactionEvent.name)
     private readonly transactionEventModel: Model<TransactionEvent>,
@@ -175,6 +178,16 @@ export class TransactionProcessor extends BaseProcessor {
             queueName: QUEUE_NAME.CREATE_POSITION_PROCESSOR,
             jobType: JOB_TYPES.PROCESS_POSITION_CREATE
           }
+        case EVENT_NAMES.POSITION_INCREASE_EVENT:
+          return {
+            queueName: QUEUE_NAME.INCREASE_POSITION_PROCESSOR,
+            jobType: JOB_TYPES.PROCESS_POSITION_INCREASE
+          }
+        case EVENT_NAMES.POSITION_DECREASE_EVENT:
+          return {
+            queueName: QUEUE_NAME.DECREASE_POSITION_PROCESSOR,
+            jobType: JOB_TYPES.PROCESS_POSITION_DECREASE
+          }
         default:
           this.logger.warn(`Unknown event: ${eventName}`)
           return null
@@ -193,9 +206,9 @@ export class TransactionProcessor extends BaseProcessor {
       case INSTRUCTION_NAMES.CREATE_POSITION:
         return { queueName: QUEUE_NAME.CREATE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CREATE }
       // case INSTRUCTION_NAMES.INCREASE_POSITION:
-      //   return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_INCREASE }
+      //   return { queueName: QUEUE_NAME.INCREASE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_INCREASE }
       // case INSTRUCTION_NAMES.DECREASE_POSITION:
-      //   return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_DECREASE }
+      //   return { queueName: QUEUE_NAME.DECREASE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_DECREASE }
       case INSTRUCTION_NAMES.CLOSE_POSITION:
         return { queueName: QUEUE_NAME.CLOSE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CLOSE }
       case INSTRUCTION_NAMES.COMPOSITION_FEES:
@@ -206,6 +219,8 @@ export class TransactionProcessor extends BaseProcessor {
         return { queueName: QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_BIN_STEP_CONFIG }
       case INSTRUCTION_NAMES.INITIALIZE_BIN_ARRAY:
         return { queueName: QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_BIN_ARRAY }
+      case INSTRUCTION_NAMES.UPDATE_PAIR_STATIC_FEE_PARAMETERS:
+        return { queueName: QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR, jobType: JOB_TYPES.PROCESS_UPDATE_PAIR_STATIC_FEE_PARAMETERS }
       // case INSTRUCTION_NAMES.INITIALIZE_QUOTE_ASSET_BADGE:
       //   return { queueName: QUEUE_NAME.QUOTE_ASSET_PROCESSOR, jobType: JOB_TYPES.PROCESS_QUOTE_ASSET }
       default:
@@ -224,6 +239,12 @@ export class TransactionProcessor extends BaseProcessor {
       case QUEUE_NAME.CREATE_POSITION_PROCESSOR:
         targetQueue = this.createPositionQueue
         break
+      case QUEUE_NAME.INCREASE_POSITION_PROCESSOR:
+        targetQueue = this.increasePositionQueue
+        break
+      case QUEUE_NAME.DECREASE_POSITION_PROCESSOR:
+        targetQueue = this.decreasePositionQueue
+        break
       case QUEUE_NAME.CLOSE_POSITION_PROCESSOR:
         targetQueue = this.closePositionQueue
         break
@@ -241,6 +262,9 @@ export class TransactionProcessor extends BaseProcessor {
         break
       case QUEUE_NAME.QUOTE_ASSET_PROCESSOR:
         targetQueue = this.quoteAssetQueue
+        break
+      case QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR:
+        targetQueue = this.updatePairStaticFeeParametersQueue
         break
       default:
         this.logger.warn(`Unknown queue: ${queueName}`)

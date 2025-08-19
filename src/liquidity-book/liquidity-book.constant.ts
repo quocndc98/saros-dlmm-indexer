@@ -9,6 +9,7 @@ export const INSTRUCTION_NAMES = {
   INITIALIZE_BIN_STEP_CONFIG: 'initialize_bin_step_config',
   INITIALIZE_BIN_ARRAY: 'initialize_bin_array',
   INITIALIZE_QUOTE_ASSET_BADGE: 'initialize_quote_asset_badge',
+  UPDATE_PAIR_STATIC_FEE_PARAMETERS: 'update_pair_static_fee_parameters',
 } as const
 
 export const EVENT_NAMES = {
@@ -17,6 +18,8 @@ export const EVENT_NAMES = {
   QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
   QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
   POSITION_CREATION_EVENT: 'PositionCreationEvent',
+  POSITION_INCREASE_EVENT: 'PositionIncreaseEvent',
+  POSITION_DECREASE_EVENT: 'PositionDecreaseEvent',
 } as const
 
 export const TYPE_NAMES = {

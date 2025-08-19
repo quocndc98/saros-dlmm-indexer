@@ -9,7 +9,10 @@ import { QuoteAssetProcessor } from '../processors/quote-asset.processor'
 import { InitializePairProcessor } from '../processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from '../processors/initialize-bin-step-config.processor'
 import { InitializeBinArrayProcessor } from '../processors/initialize-bin-array.processor'
+import { IncreasePositionProcessor } from '../processors/increase-position.processor'
+import { DecreasePositionProcessor } from '../processors/decrease-position.processor'
 import { ClosePositionProcessor } from '../processors/close-position.processor'
+import { UpdatePairStaticFeeParametersProcessor } from '../processors/update-pair-static-fee-parameters.processor'
 import { QUEUE_NAME } from '../../queue/queue.constant'
 import { Logger } from '@/lib'
 import { Worker } from 'bullmq'
@@ -25,9 +28,12 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly transactionProcessor: TransactionProcessor,
     private readonly swapProcessor: SwapProcessor,
+    private readonly increasePositionProcessor: IncreasePositionProcessor,
+    private readonly decreasePositionProcessor: DecreasePositionProcessor,
     private readonly createPositionProcessor: CreatePositionProcessor,
     private readonly closePositionProcessor: ClosePositionProcessor,
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
+    private readonly updatePairStaticFeeParametersProcessor: UpdatePairStaticFeeParametersProcessor,
     private readonly initializePairProcessor: InitializePairProcessor,
     private readonly initializeBinStepConfigProcessor: InitializeBinStepConfigProcessor,
     private readonly initializeBinArrayProcessor: InitializeBinArrayProcessor,
@@ -87,6 +93,26 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     )
     this.workers.push(createPositionWorker)
 
+    const increasePositionWorker = new Worker(
+      QUEUE_NAME.INCREASE_POSITION_PROCESSOR,
+      async (job) => await this.increasePositionProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(increasePositionWorker)
+
+    const decreasePositionWorker = new Worker(
+      QUEUE_NAME.DECREASE_POSITION_PROCESSOR,
+      async (job) => await this.decreasePositionProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(decreasePositionWorker)
+
     const closePositionWorker = new Worker(
       QUEUE_NAME.CLOSE_POSITION_PROCESSOR,
       async (job) => await this.closePositionProcessor.process(job),
@@ -107,6 +133,17 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       }
     )
     this.workers.push(compositionFeesWorker)
+
+    // Update pair static fee parameters processor worker
+    const updatePairStaticFeeParametersWorker = new Worker(
+      QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR,
+      async (job) => await this.updatePairStaticFeeParametersProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(updatePairStaticFeeParametersWorker)
 
     // Initialize pair processor worker
     const initializePairWorker = new Worker(

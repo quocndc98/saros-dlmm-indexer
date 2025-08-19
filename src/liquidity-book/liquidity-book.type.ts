@@ -135,7 +135,20 @@ export type QuoteAssetBadgeUpdateEvent = {
   status: QuoteAssetBadgeStatus
 }
 
+export type PositionIncreaseEvent = {
+  pair: PublicKey
+  position: PublicKey
+  bin_ids: number[]
+  amounts_x: BN[]
+  amounts_y: BN[]
+  liquidity_minted: BN
+}
+
 export enum QuoteAssetBadgeStatus {
   Disabled = 'DISABLED',
   Enabled = 'ENABLED',
+}
+
+export interface UpdatePairStaticFeeParametersArgs {
+  fee_parameters: StaticFeeParameters
 }
