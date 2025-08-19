@@ -165,6 +165,11 @@ export class TransactionProcessor extends BaseProcessor {
             queueName: QUEUE_NAME.QUOTE_ASSET_PROCESSOR,
             jobType: JOB_TYPES.PROCESS_QUOTE_ASSET
           }
+        case EVENT_NAMES.POSITION_CREATION_EVENT:
+          return {
+            queueName: QUEUE_NAME.POSITION_PROCESSOR,
+            jobType: JOB_TYPES.PROCESS_POSITION_CREATE
+          }
         default:
           this.logger.warn(`Unknown event: ${eventName}`)
           return null

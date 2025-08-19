@@ -15,6 +15,7 @@ export const EVENT_NAMES = {
   COMPOSITION_FEES_EVENT: 'CompositionFeesEvent',
   QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
   QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
+  POSITION_CREATION_EVENT: 'PositionCreationEvent',
 } as const
 
 export const TYPE_NAMES = {
@@ -24,7 +25,8 @@ export const TYPE_NAMES = {
   BIN_LIQUIDITY_DISTRIBUTION: 'BinLiquidityDistribution',
   COMPOSITION_FEES_EVENT: 'CompositionFeesEvent',
   QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
-  QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent'
+  QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
+  POSITION_CREATION_EVENT: 'PositionCreationEvent',
 } as const
 
 export const MDMA_HOOK_INSTRUCTION_NAMES = {

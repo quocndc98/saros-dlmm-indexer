@@ -108,3 +108,11 @@ export interface UiTokenAccount {
   }
   closeAuthority?: string
 }
+
+export interface PositionCreationEventDecoded {
+  pair: string
+  position: string
+  position_mint: string
+  lower_bin_id: number
+  upper_bin_id: number
+}
