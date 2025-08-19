@@ -12,6 +12,7 @@ export const INSTRUCTION_NAMES = {
 } as const
 
 export const EVENT_NAMES = {
+  BIN_SWAP_EVENT: 'BinSwapEvent',
   COMPOSITION_FEES_EVENT: 'CompositionFeesEvent',
   QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',
   QUOTE_ASSET_BADGE_UPDATE_EVENT: 'QuoteAssetBadgeUpdateEvent',
@@ -21,7 +22,7 @@ export const EVENT_NAMES = {
 export const TYPE_NAMES = {
   BIN: 'Bin',
   BIN_ARRAY: 'BinArray',
-  BIN_SWAP: 'BinSwapEvent',
+  BIN_SWAP_EVENT: 'BinSwapEvent',
   BIN_LIQUIDITY_DISTRIBUTION: 'BinLiquidityDistribution',
   COMPOSITION_FEES_EVENT: 'CompositionFeesEvent',
   QUOTE_ASSET_BADGE_INITIALIZATION_EVENT: 'QuoteAssetBadgeInitializationEvent',

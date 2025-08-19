@@ -24,6 +24,7 @@ import { Bin, BinSchema } from './schemas/bin.schema'
 // Services
 import { SolanaService } from './services/solana.service'
 import { TransactionParserService } from './services/transaction-parser.service'
+import { InstructionService } from './services/instruction.service'
 
 // Scanner
 import { ScannerService } from './scanner/scanner.service'
@@ -80,6 +81,7 @@ import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shar
     // Services
     SolanaService,
     TransactionParserService,
+    InstructionService,
 
     // Scanner
     ScannerService,

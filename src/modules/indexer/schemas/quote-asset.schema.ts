@@ -3,9 +3,9 @@ import { Document } from 'mongoose'
 import { QuoteAssetStatus, QuoteAssetType } from '../types/enums'
 
 @Schema({ timestamps: true })
-export class QuoteAsset extends Document {
+export class QuoteAsset {
   @Prop({ required: true, unique: true })
-  declare id: string
+  id: string
 
   @Prop({ required: true })
   tokenMintId: string

@@ -116,7 +116,7 @@ export class InitializeBinStepConfigProcessor extends BaseProcessor {
       }
 
       // Create bin step config record
-      const binStepConfigData = {
+      const binStepConfigData: BinStepConfig = {
         id: decoded.bin_step_config,
         liquidityBookConfig: decoded.liquidity_book_config,
         status: BinStepConfigStatus.Active,

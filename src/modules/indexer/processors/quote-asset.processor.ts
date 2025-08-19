@@ -7,9 +7,14 @@ import { BaseProcessor } from './base.processor'
 import { QuoteAsset } from '../schemas/quote-asset.schema'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { splitAt } from '../../../utils/helper'
-import { QuoteAssetBadgeInitializationEvent, QuoteAssetBadgeStatus, QuoteAssetBadgeUpdateEvent } from '../../../liquidity-book/liquidity-book.type'
-import { QuoteAssetType } from '../types/enums'
+import {
+  QuoteAssetBadgeInitializationEvent,
+  QuoteAssetBadgeStatus,
+  QuoteAssetBadgeUpdateEvent,
+} from '../../../liquidity-book/liquidity-book.type'
+import { ProcessorName, QuoteAssetStatus, QuoteAssetType } from '../types/enums'
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
+import { InstructionService } from '../services/instruction.service'
 
 // Constants from Rust
 const EVENT_IDENTIFIER = Buffer.from([228, 69, 165, 46, 81, 203, 154, 29])
@@ -18,7 +23,10 @@ const QUOTE_ASSET_UPDATE_EVENT_DISCRIMINATOR = Buffer.from([102, 149, 171, 236, 
 
 @Injectable()
 export class QuoteAssetProcessor extends BaseProcessor {
-  constructor(@InjectModel(QuoteAsset.name) private readonly quoteAssetModel: Model<QuoteAsset>) {
+  constructor(
+    @InjectModel(QuoteAsset.name) private readonly quoteAssetModel: Model<QuoteAsset>,
+    private readonly instructionService: InstructionService,
+  ) {
     super(QuoteAssetProcessor.name)
   }
 
@@ -26,7 +34,15 @@ export class QuoteAssetProcessor extends BaseProcessor {
     this.logJobStart(job)
 
     try {
-      const { instruction } = job.data
+      const {
+        block_number,
+        transaction_signature,
+        instruction,
+        instruction_index,
+        inner_instruction_index,
+        is_inner,
+        block_time,
+      } = job.data
 
       // Parse instruction data (matching Rust logic)
       const decodedData = Buffer.from(bs58.decode(instruction.data))
@@ -46,7 +62,15 @@ export class QuoteAssetProcessor extends BaseProcessor {
           eventData,
         )
         if (decoded) {
-          await this.processInitEvent(decoded)
+          await this.processInitEvent(
+            decoded,
+            block_number,
+            transaction_signature,
+            instruction_index,
+            inner_instruction_index,
+            is_inner,
+            block_time,
+          )
         }
       } else if (discriminator.equals(QUOTE_ASSET_UPDATE_EVENT_DISCRIMINATOR)) {
         const decoded = LiquidityBookLibrary.decodeType<QuoteAssetBadgeUpdateEvent>(
@@ -54,7 +78,15 @@ export class QuoteAssetProcessor extends BaseProcessor {
           eventData,
         )
         if (decoded) {
-          await this.processUpdateEvent(decoded)
+          await this.processUpdateEvent(
+            decoded,
+            block_number,
+            transaction_signature,
+            instruction_index,
+            inner_instruction_index,
+            is_inner,
+            block_time,
+          )
         }
       }
 
@@ -64,11 +96,34 @@ export class QuoteAssetProcessor extends BaseProcessor {
     }
   }
 
-  // NOT TEST YET
-  private async processInitEvent(eventData: QuoteAssetBadgeInitializationEvent): Promise<void> {
+  private async processInitEvent(
+    eventData: QuoteAssetBadgeInitializationEvent,
+    blockNumber: number,
+    signature: string,
+    instructionIndex: number,
+    innerInstructionIndex: number | null,
+    isInner: boolean,
+    blockTime: number | null,
+  ): Promise<void> {
     try {
+      // Check if instruction already processed (matching Rust instruction deduplication)
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
+        blockNumber,
+        signature,
+        processorName: ProcessorName.QuoteAssetProcessor,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
+      })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(`Quote asset init event already processed for signature: ${signature}`)
+        return
+      }
+
       // Check if quote asset already exists (matching Rust logic)
-      const existing = await this.quoteAssetModel.findOne({
+      const existing = await this.quoteAssetModel.exists({
         id: eventData.quote_asset_badge.toBase58(),
       })
 
@@ -80,10 +135,10 @@ export class QuoteAssetProcessor extends BaseProcessor {
       }
 
       // Create new quote asset (matching Rust fields exactly)
-      const quoteAssetData = {
+      const quoteAssetData: QuoteAsset = {
         id: eventData.quote_asset_badge.toBase58(),
         tokenMintId: eventData.token_mint.toBase58(),
-        status: QuoteAssetBadgeStatus.Enabled,
+        status: QuoteAssetStatus.Enabled,
         assetType: QuoteAssetType.Other, // TODO: Update this logic
       }
 
@@ -95,10 +150,35 @@ export class QuoteAssetProcessor extends BaseProcessor {
     }
   }
 
-  private async processUpdateEvent(eventData: QuoteAssetBadgeUpdateEvent): Promise<void> {
+  // NOT TEST YET
+  private async processUpdateEvent(
+    eventData: QuoteAssetBadgeUpdateEvent,
+    blockNumber: number,
+    signature: string,
+    instructionIndex: number,
+    innerInstructionIndex: number | null,
+    isInner: boolean,
+    blockTime: number | null,
+  ): Promise<void> {
     try {
+      // Check if instruction already processed (matching Rust instruction deduplication)
+      const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
+        blockNumber,
+        signature,
+        processorName: ProcessorName.QuoteAssetProcessor,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
+      })
+
+      if (isAlreadyProcessed) {
+        this.logger.log(`Quote asset update event already processed for signature: ${signature}`)
+        return
+      }
+
       // Find existing quote asset (matching Rust logic)
-      const existing = await this.quoteAssetModel.findOne({
+      const existing = await this.quoteAssetModel.exists({
         id: eventData.quote_asset_badge.toBase58(),
       })
 
@@ -109,15 +189,15 @@ export class QuoteAssetProcessor extends BaseProcessor {
       }
 
       // Update status (matching Rust enum conversion)
-      const statusValue = eventData.status === QuoteAssetBadgeStatus.Disabled
-        ? QuoteAssetBadgeStatus.Disabled
-        : QuoteAssetBadgeStatus.Enabled
+      const statusValue =
+        eventData.status === QuoteAssetBadgeStatus.Disabled
+          ? QuoteAssetStatus.Disabled
+          : QuoteAssetStatus.Enabled
 
       await this.quoteAssetModel.updateOne(
         { id: eventData.quote_asset_badge.toBase58() },
         {
           status: statusValue,
-          updatedAt: new Date(),
         },
       )
 
