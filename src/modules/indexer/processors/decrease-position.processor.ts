@@ -18,6 +18,7 @@ import { splitAt } from '../../../utils/helper'
 import { PositionDecreaseEvent } from '../../../liquidity-book/liquidity-book.type'
 import { BN } from '@coral-xyz/anchor'
 import { BIN_PER_POSITION } from '../constants/indexer.constants'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 // Constants from Rust - event discriminator for PositionDecreaseEvent
 const POSITION_DECREASE_EVENT_DISCRIMINATOR = [200, 116, 151, 126, 182, 237, 245, 254]
@@ -47,23 +48,23 @@ export class DecreasePositionProcessor extends BaseProcessor {
     super(DecreasePositionProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex ,
+        innerInstructionIndex ,
+        isInner ,
+        blockTime ,
       } = job.data
 
-      this.logger.log(`Processing decrease position event for signature: ${transaction_signature}`)
+      this.logger.log(`Processing decrease position event for signature: ${signature}`)
       this.logger.log(
-        `Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`,
+        `Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`,
       )
 
       // 1. Decode event data from raw instruction (matching Rust approach)
@@ -84,18 +85,18 @@ export class DecreasePositionProcessor extends BaseProcessor {
 
       // 2. Check if instruction already processed (matching Rust instruction deduplication)
       const { isAlreadyProcessed, instruction: instructionCreated } = await this.instructionService.checkAndInsertInstruction({
-        blockNumber: block_number,
-        signature: transaction_signature,
+        blockNumber: blockNumber,
+        signature: signature,
         processorName: ProcessorName.DecreasePositionProcessor,
-        instructionIndex: instruction_index,
-        innerInstructionIndex: inner_instruction_index,
-        isInner: is_inner,
-        blockTime: block_time,
+        instructionIndex: instructionIndex,
+        innerInstructionIndex: innerInstructionIndex,
+        isInner: isInner,
+        blockTime: blockTime,
       })
 
       if (isAlreadyProcessed) {
         this.logger.log(
-          `Decrease position event already processed for signature: ${transaction_signature}`,
+          `Decrease position event already processed for signature: ${signature}`,
         )
         return
       }
@@ -103,12 +104,12 @@ export class DecreasePositionProcessor extends BaseProcessor {
       // 3. Process the position decrease
       await this.processDecreasePosition(
         decoded,
-        transaction_signature,
+        signature,
         instructionCreated.id,
-        instruction_index,
-        inner_instruction_index,
-        block_number,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        blockNumber,
+        blockTime,
       )
 
       this.logJobComplete(job)

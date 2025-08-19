@@ -4,35 +4,22 @@ import { Document } from 'mongoose'
 export type LiquiditySharesDocument = LiquidityShares & Document
 
 @Schema({
-  timestamps: true, // Automatically adds createdAt and updatedAt
+  timestamps: true,
 })
 export class LiquidityShares {
-  @Prop({ 
-    type: String, 
-    required: true, 
-    unique: true,
-  })
-  id: string // Primary key (format: {position_id}-{index})
+  @Prop({ required: true, unique: true })
+  id: string // Format: {positionId}-{index}
 
-  @Prop({ 
-    type: String, 
-    required: true,
-    index: true
-  })
-  positionId: string // Position ID (renamed from position_id to match TypeScript conventions)
+  @Prop({ required: true })
+  positionId: string
 
-  @Prop({ 
-    type: Number, 
-    required: true,
-  })
-  index: number // Liquidity share index (i32 in Rust)
+  @Prop({ required: true })
+  index: number
 
-  @Prop({ 
-    type: String, 
-    required: true,
-    default: '0' 
-  })
-  balance: string // Balance as string (BigDecimal equivalent in Rust)
+  @Prop({ default: '0' })
+  balance: string
 }
 
 export const LiquiditySharesSchema = SchemaFactory.createForClass(LiquidityShares)
+
+// TODO: Define indexes

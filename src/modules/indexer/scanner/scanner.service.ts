@@ -28,7 +28,7 @@ export class ScannerService {
     @Inject(indexerConfig.KEY)
     private readonly config: ConfigType<typeof indexerConfig>,
     @InjectModel(TransactionEvent.name)
-    private readonly transactionModel: Model<TransactionEvent>,
+    private readonly transactionEventModel: Model<TransactionEvent>,
     private readonly solanaService: SolanaService,
     @InjectQueue(QUEUE_NAME.TRANSACTION_PROCESSOR)
     private readonly transactionQueue: Queue,
@@ -174,15 +174,15 @@ export class ScannerService {
       .filter((sig) => !sig.err)
       .map((sig) => ({
         signature: sig.signature,
-        slot: sig.slot,
-        blockTime: new Date(sig.blockTime * 1000),
+        blockNumber: sig.slot,
+        blockTime: sig.blockTime ? new Date(sig.blockTime * 1000) : null,
         processed: false,
         queued: false, // Initialize as not queued
       }))
 
     // Bulk insert, ignore duplicates
     try {
-      await this.transactionModel.insertMany(transactionEvents, {
+      await this.transactionEventModel.insertMany(transactionEvents, {
         ordered: false, // Continue inserting even if some fail due to duplicates
       })
       this.logger.log(`Indexed ${transactionEvents.length} transaction signatures`)
@@ -209,17 +209,17 @@ export class ScannerService {
     this.logger.log('Processing unprocessed transactions in slot order...')
 
     try {
-      const batchSize = this.config.batchSize
+      const batchSize = 100 // this.config.batchSize
       let hasMore = true
 
       while (hasMore) {
         // TODO: consider to use cursor-based pagination instead of skip
-        const unprocessedTransactions = await this.transactionModel
+        const unprocessedTransactions = await this.transactionEventModel
           .find({
             processed: false,
-            queued: { $ne: true } // Only get transactions not yet queued
+            queued: { $ne: true }, // Only get transactions not yet queued
           })
-          .sort({ slot: 1, _id: 1 }) // Transaction inserted to db keep order real in blockchain so if same slot transaction have _id smallest will be oldest
+          .sort({ blockNumber: 1, _id: 1 }) // Transaction inserted to db keep order real in blockchain so if same slot transaction have _id smallest will be oldest
           .limit(batchSize) // Remove skip, use cursor-based approach
           .lean()
 
@@ -251,16 +251,16 @@ export class ScannerService {
           name: JOB_TYPES.PROCESS_TRANSACTION,
           data: {
             signature: transaction.signature,
-            slot: transaction.slot,
+            blockNumber: transaction.blockNumber,
             blockTime: transaction.blockTime,
           },
         })),
       )
 
       // Mark as queued (NOT processed yet - will be marked processed in TransactionProcessor)
-      await this.transactionModel.updateMany(
+      await this.transactionEventModel.updateMany(
         { _id: { $in: transactions.map((tx) => tx._id) } },
-        { queued: true, updated_at: new Date() },
+        { queued: true },
       )
     } catch (error) {
       this.logger.error(
@@ -273,17 +273,17 @@ export class ScannerService {
   private async getOldestTransactionLocal(): Promise<string | null> {
     // @dev Fetches transactions in DESC order from RPC. InsertMany reverses the order to match blockchain chronology.
     // For same-slot txs, smaller _id means older.
-    const transactionEvent = await this.transactionModel
+    const transactionEvent = await this.transactionEventModel
       .findOne({}, { signature: 1 })
-      .sort({ slot: 1, _id: 1 })
+      .sort({ blockNumber: 1, _id: 1 })
       .lean()
     return transactionEvent?.signature
   }
 
   private async getNewestTransactionLocal(): Promise<string | null> {
-    const transactionEvent = await this.transactionModel
+    const transactionEvent = await this.transactionEventModel
       .findOne({}, { signature: 1 })
-      .sort({ slot: -1, _id: -1 })
+      .sort({ blockNumber: -1, _id: -1 })
       .lean()
     return transactionEvent?.signature
   }
@@ -307,15 +307,17 @@ export class ScannerService {
   }
 
   async getStatus() {
-    const totalTransactions = await this.transactionModel.countDocuments()
-    const processedTransactions = await this.transactionModel.countDocuments({ processed: true })
+    const totalTransactions = await this.transactionEventModel.countDocuments()
+    const processedTransactions = await this.transactionEventModel.countDocuments({
+      processed: true,
+    })
     const unprocessedTransactions = totalTransactions - processedTransactions
 
     // Get genesis status
     const genesisReached = await this.checkGenesisReached()
-    const oldestTransaction = await this.transactionModel
+    const oldestTransaction = await this.transactionEventModel
       .findOne({})
-      .sort({ slot: 1, signature: 1 })
+      .sort({ blockNumber: 1, signature: 1 })
       .exec()
 
     return {
@@ -330,7 +332,7 @@ export class ScannerService {
       oldestTransaction: oldestTransaction
         ? {
             signature: oldestTransaction.signature,
-            slot: oldestTransaction.slot,
+            blockNumber: oldestTransaction.blockNumber,
             blockTime: oldestTransaction.blockTime,
           }
         : null,
@@ -342,9 +344,9 @@ export class ScannerService {
    */
   async validateGenesis() {
     const genesisReached = await this.checkGenesisReached()
-    const oldestTransaction = await this.transactionModel
+    const oldestTransaction = await this.transactionEventModel
       .findOne({})
-      .sort({ slot: 1, signature: 1 })
+      .sort({ blockNumber: 1, signature: 1 })
       .exec()
 
     return {
@@ -352,7 +354,7 @@ export class ScannerService {
       oldestTransaction: oldestTransaction
         ? {
             signature: oldestTransaction.signature,
-            slot: oldestTransaction.slot,
+            blockNumber: oldestTransaction.blockNumber,
             blockTime: oldestTransaction.blockTime,
           }
         : null,

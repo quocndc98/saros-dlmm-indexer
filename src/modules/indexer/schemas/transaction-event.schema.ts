@@ -4,13 +4,13 @@ import { Document } from 'mongoose'
 @Schema({ timestamps: true })
 export class TransactionEvent extends Document {
   @Prop({ required: true })
+  blockNumber: number
+
+  @Prop({ required: true })
   signature: string
 
-  @Prop({ required: true })
-  slot: number
-
-  @Prop({ required: true })
-  blockTime: Date
+  @Prop()
+  blockTime?: Date | null
 
   @Prop({ required: true })
   processed: boolean

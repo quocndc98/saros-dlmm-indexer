@@ -10,6 +10,7 @@ import { LiquidityShares } from '../schemas/liquidity-shares.schema'
 import { InstructionService } from '../services/instruction.service'
 import { ProcessorName } from '../types/enums'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 interface ClosePositionDecoded {
   pair: string
@@ -23,28 +24,31 @@ export class ClosePositionProcessor extends BaseProcessor {
   constructor(
     @InjectModel(Position.name) private readonly positionModel: Model<Position>,
     @InjectModel(Instruction.name) private readonly instructionModel: Model<Instruction>,
-    @InjectModel(LiquidityShares.name) private readonly liquiditySharesModel: Model<LiquidityShares>,
+    @InjectModel(LiquidityShares.name)
+    private readonly liquiditySharesModel: Model<LiquidityShares>,
     private readonly instructionService: InstructionService,
   ) {
     super(ClosePositionProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
-      this.logger.log(`Processing close position instruction for signature: ${transaction_signature}`)
-      this.logger.log(`Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`)
+      this.logger.log(`Processing close position instruction for signature: ${signature}`)
+      this.logger.log(
+        `Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`,
+      )
 
       // 1. Decode instruction data from raw instruction (matching Rust and InitializePairProcessor approach)
       const decoded = await this.decodeClosePositionInstruction(instruction)
@@ -58,22 +62,22 @@ export class ClosePositionProcessor extends BaseProcessor {
 
       // 2. Check if instruction already processed (matching Rust instruction deduplication)
       const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
-        blockNumber: block_number,
-        signature: transaction_signature,
+        blockNumber: blockNumber,
+        signature: signature,
         processorName: ProcessorName.ClosePositionProcessor,
-        instructionIndex: instruction_index,
-        innerInstructionIndex: inner_instruction_index,
-        isInner: is_inner,
-        blockTime: block_time,
+        instructionIndex: instructionIndex,
+        innerInstructionIndex: innerInstructionIndex,
+        isInner: isInner,
+        blockTime: blockTime,
       })
 
       if (isAlreadyProcessed) {
-        this.logger.log(`Close position instruction already processed for signature: ${transaction_signature}`)
+        this.logger.log(`Close position instruction already processed for signature: ${signature}`)
         return
       }
 
       // 3. Process the position closure
-      await this.processClosePosition(decoded, transaction_signature, instruction_index, block_number)
+      await this.processClosePosition(decoded, signature, instructionIndex, blockNumber)
 
       this.logJobComplete(job)
     } catch (error) {
@@ -86,16 +90,12 @@ export class ClosePositionProcessor extends BaseProcessor {
   ): Promise<ClosePositionDecoded | null> {
     try {
       const { idlIx } = LiquidityBookLibrary.decodeInstruction(instruction.data)
-      const accounts = LiquidityBookLibrary.getAccountsByName(
-        idlIx,
-        instruction.accounts,
-        [
-          'pair',
-          'position',
-          'position_mint',
-          'position_token_account',
-        ],
-      )
+      const accounts = LiquidityBookLibrary.getAccountsByName(idlIx, instruction.accounts, [
+        'pair',
+        'position',
+        'position_mint',
+        'position_token_account',
+      ])
 
       return {
         pair: accounts.pair.toString(),
@@ -127,15 +127,17 @@ export class ClosePositionProcessor extends BaseProcessor {
 
       if (!isIndexedDecreasePosition) {
         throw new Error(
-          `Indexing Close Position before Decrease Position event for txn: ${txnSignature}`
+          `Indexing Close Position before Decrease Position event for txn: ${txnSignature}`,
         )
       }
 
       // Check if position exists (matching Rust position_crud::get)
       this.logger.log(`Checking if position ${decoded.position} exists...`)
-      const existingPosition = await this.positionModel.findOne({
-        id: decoded.position
-      }).lean()
+      const existingPosition = await this.positionModel
+        .findOne({
+          id: decoded.position,
+        })
+        .lean()
 
       if (!existingPosition) {
         throw new Error('Processing Close Position for non-existent position')
@@ -144,20 +146,22 @@ export class ClosePositionProcessor extends BaseProcessor {
       // Validate pair matches (matching Rust validation exactly)
       if (existingPosition.pairId !== decoded.pair) {
         throw new Error(
-          `Processing Close Position for non-matching position ${decoded.position} and pair_id ${decoded.pair}`
+          `Processing Close Position for non-matching position ${decoded.position} and pair_id ${decoded.pair}`,
         )
       }
 
       this.logger.log(`Closing position ${decoded.position} for pair ${decoded.pair}`)
 
       const deletedShares = await this.liquiditySharesModel.deleteMany({
-        positionId: decoded.position
+        positionId: decoded.position,
       })
 
-      this.logger.log(`Deleted ${deletedShares.deletedCount} liquidity shares for position: ${decoded.position}`)
+      this.logger.log(
+        `Deleted ${deletedShares.deletedCount} liquidity shares for position: ${decoded.position}`,
+      )
 
       const deletedPosition = await this.positionModel.deleteOne({
-        id: decoded.position
+        id: decoded.position,
       })
 
       if (deletedPosition.deletedCount === 0) {

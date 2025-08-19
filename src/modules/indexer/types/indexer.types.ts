@@ -1,20 +1,13 @@
 import { PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
 
 export interface ParsedInstructionMessage {
-  block_number: number // slot
-  transaction_signature: string
-  instruction: PartiallyDecodedInstruction
-  instruction_index: number
-  inner_instruction_index?: number
-  is_inner: boolean
-  block_time?: number
-}
-
-export interface ParsedTransactionMessage {
+  blockNumber: number // slot
   signature: string
-  slot: number
-  blockTime: number
-  instructions: ParsedInstructionMessage[]
+  instruction: PartiallyDecodedInstruction
+  instructionIndex: number
+  isInner: boolean
+  innerInstructionIndex?: number
+  blockTime?: number
 }
 
 export interface SwapEventData {
@@ -55,14 +48,6 @@ export interface QuoteAssetData {
   name: string
   decimals: number
   priceUsd?: number
-}
-
-export interface SolanaTransactionData {
-  signature: string
-  slot: number
-  blockTime: number | null
-  transaction: any
-  meta: any
 }
 
 export interface CreatePositionDecoded {

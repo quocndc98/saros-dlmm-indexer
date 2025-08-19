@@ -7,10 +7,12 @@ import { PartiallyDecodedInstruction } from '@solana/web3.js'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { Bin, BinDocument } from '../schemas/bin.schema'
 import { InitializeBinArrayArgs } from '../../../liquidity-book/liquidity-book.type'
+import { ParsedInstructionMessage } from '../types/indexer.types'
+import { BIN_ARRAY_SIZE } from '../../../liquidity-book/liquidity-book.constant'
 
 // Constants from Rust - identifier for initialize_bin_array instruction
 const INITIALIZE_BIN_ARRAY_IDENTIFIER = [35, 86, 19, 185, 78, 212, 75, 211]
-const BIN_ARRAY_SIZE = 256
+
 
 interface InitializeBinArrayDecoded {
   index: number
@@ -26,22 +28,22 @@ export class InitializeBinArrayProcessor extends BaseProcessor {
     super(InitializeBinArrayProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime
       } = job.data
 
-      this.logger.log(`Processing initialize bin array instruction for signature: ${transaction_signature}`)
-      this.logger.log(`Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`)
+      this.logger.log(`Processing initialize bin array instruction for signature: ${signature}`)
+      this.logger.log(`Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`)
 
       // 1. Decode instruction data from raw instruction (matching Rust approach)
       const decoded = await this.decodeInitializeBinArrayInstruction(instruction)

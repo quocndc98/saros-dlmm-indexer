@@ -8,8 +8,13 @@ import { Instruction } from '../schemas/instruction.schema'
 import { InstructionService } from '../services/instruction.service'
 import { ProcessorName } from '../types/enums'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
-import { StaticFeeParameters, UpdatePairStaticFeeParametersArgs } from '../../../liquidity-book/liquidity-book.type'
+import {
+  StaticFeeParameters,
+  UpdatePairStaticFeeParametersArgs,
+} from '../../../liquidity-book/liquidity-book.type'
 import { PartiallyDecodedInstruction } from '@solana/web3.js'
+import { ParsedInstructionMessage } from '../types/indexer.types'
+import { INSTRUCTION_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 
 interface UpdatePairStaticFeeParametersDecoded {
   fee_parameters: StaticFeeParameters
@@ -26,22 +31,26 @@ export class UpdatePairStaticFeeParametersProcessor extends BaseProcessor {
     super(UpdatePairStaticFeeParametersProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
-      this.logger.log(`Processing update pair static fee parameters instruction for signature: ${transaction_signature}`)
-      this.logger.log(`Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`)
+      this.logger.log(
+        `Processing update pair static fee parameters instruction for signature: ${signature}`,
+      )
+      this.logger.log(
+        `Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`,
+      )
 
       // 1. Decode instruction data (matching Rust and other processors approach)
       const decoded = await this.decodeUpdatePairStaticFeeParametersInstruction(instruction)
@@ -51,24 +60,28 @@ export class UpdatePairStaticFeeParametersProcessor extends BaseProcessor {
         return
       }
 
-      this.logger.log(`Decoded update pair static fee parameters: ${JSON.stringify({
-        pair: decoded.pair,
-        base_factor: decoded.fee_parameters.base_factor
-      })}`)
+      this.logger.log(
+        `Decoded update pair static fee parameters: ${JSON.stringify({
+          pair: decoded.pair,
+          base_factor: decoded.fee_parameters.base_factor,
+        })}`,
+      )
 
       // 2. Check if instruction already processed (matching Rust instruction deduplication)
       const { isAlreadyProcessed } = await this.instructionService.checkAndInsertInstruction({
-        blockNumber: block_number,
-        signature: transaction_signature,
+        blockNumber: blockNumber,
+        signature: signature,
         processorName: ProcessorName.UpdatePairStaticFeeParametersProcessor,
-        instructionIndex: instruction_index,
-        innerInstructionIndex: inner_instruction_index,
-        isInner: is_inner,
-        blockTime: block_time,
+        instructionIndex: instructionIndex,
+        innerInstructionIndex: innerInstructionIndex,
+        isInner: isInner,
+        blockTime: blockTime,
       })
 
       if (isAlreadyProcessed) {
-        this.logger.log(`Update pair static fee parameters instruction already processed for signature: ${transaction_signature}`)
+        this.logger.log(
+          `Update pair static fee parameters instruction already processed for signature: ${signature}`,
+        )
         return
       }
 
@@ -93,23 +106,23 @@ export class UpdatePairStaticFeeParametersProcessor extends BaseProcessor {
       }
 
       // Verify instruction name matches update_pair_static_fee_parameters
-      if (idlIx.name !== 'update_pair_static_fee_parameters') {
-        this.logger.debug(`Instruction name ${idlIx.name} does not match update_pair_static_fee_parameters`)
+      if (idlIx.name !== INSTRUCTION_NAMES.UPDATE_PAIR_STATIC_FEE_PARAMETERS) {
+        this.logger.debug(
+          `Instruction name ${idlIx.name} does not match update_pair_static_fee_parameters`,
+        )
         return null
       }
 
-      const accounts = LiquidityBookLibrary.getAccountsByName(
-        idlIx,
-        instruction.accounts,
-        [
-          'liquidity_book_config',
-          'pair',
-        ],
-      )
+      const accounts = LiquidityBookLibrary.getAccountsByName(idlIx, instruction.accounts, [
+        'liquidity_book_config',
+        'pair',
+      ])
 
       // Validate required accounts exist
       if (!accounts.liquidity_book_config || !accounts.pair) {
-        this.logger.warn('Missing required accounts in update pair static fee parameters instruction')
+        this.logger.warn(
+          'Missing required accounts in update pair static fee parameters instruction',
+        )
         return null
       }
 
@@ -136,7 +149,9 @@ export class UpdatePairStaticFeeParametersProcessor extends BaseProcessor {
       const existingPair = await this.pairModel.findOne({ id: decoded.pair })
 
       if (!existingPair) {
-        throw new Error(`Processing update pair static fee instruction for non existent pair: ${decoded.pair}`)
+        throw new Error(
+          `Processing update pair static fee instruction for non existent pair: ${decoded.pair}`,
+        )
       }
 
       this.logger.log(`Updating static fee parameters for pair: ${decoded.pair}`)
@@ -152,7 +167,7 @@ export class UpdatePairStaticFeeParametersProcessor extends BaseProcessor {
           variableFeeControl: decoded.fee_parameters.variable_fee_control,
           maxVolatilityAccumulator: decoded.fee_parameters.max_volatility_accumulator,
           protocolShare: decoded.fee_parameters.protocol_share,
-        }
+        },
       )
 
       this.logger.log(`Successfully updated static fee parameters for pair: ${decoded.pair}`)

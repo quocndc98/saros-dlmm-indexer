@@ -56,29 +56,31 @@ export class Pair {
   @Prop({ required: true })
   protocolShare: number
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   volatilityAccumulator: number
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   volatilityReference: number
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   idReference: number
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   timeLastUpdated: number
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   protocolFeesX: string
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   protocolFeesY: string
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   reserveX: string
 
-  @Prop({ required: true, default: 0 })
+  @Prop({ default: 0 })
   reserveY: string
 }
 
 export const PairSchema = SchemaFactory.createForClass(Pair)
+
+// TODO: Define indexes

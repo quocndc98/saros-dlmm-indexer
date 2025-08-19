@@ -12,6 +12,7 @@ import { BinStepConfig, BinStepConfigDocument } from '../schemas/bin-step-config
 import { Metaplex } from '@metaplex-foundation/js'
 import base58 from 'bs58'
 import { InitializePairArgs } from '../../../liquidity-book/liquidity-book.type'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 // Constants from Rust - identifier for initialize_pair instruction
 const INITIALIZE_PAIR_IDENTIFIER = [177, 114, 226, 34, 186, 150, 5, 245]
@@ -34,7 +35,8 @@ export class InitializePairProcessor extends BaseProcessor {
     private readonly solanaService: SolanaService,
     @InjectModel(Pair.name) private readonly pairModel: Model<PairDocument>,
     @InjectModel(TokenMint.name) private readonly tokenMintModel: Model<TokenMintDocument>,
-    @InjectModel(BinStepConfig.name) private readonly binStepConfigModel: Model<BinStepConfigDocument>,
+    @InjectModel(BinStepConfig.name)
+    private readonly binStepConfigModel: Model<BinStepConfigDocument>,
   ) {
     super(InitializePairProcessor.name)
 
@@ -42,22 +44,24 @@ export class InitializePairProcessor extends BaseProcessor {
     this.metaplex = Metaplex.make(this.solanaService.getConnection())
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
-      this.logger.log(`Processing initialize pair instruction for signature: ${transaction_signature}`)
-      this.logger.log(`Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`)
+      this.logger.log(`Processing initialize pair instruction for signature: ${signature}`)
+      this.logger.log(
+        `Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`,
+      )
 
       // 1. Decode instruction data from raw instruction (matching Rust approach)
       const decoded = await this.decodeInitializePairInstruction(instruction)
@@ -83,18 +87,14 @@ export class InitializePairProcessor extends BaseProcessor {
   ): Promise<InitializePairDecoded | null> {
     try {
       const { idlIx, decodedIx } = LiquidityBookLibrary.decodeInstruction(instruction.data)
-      const accounts = LiquidityBookLibrary.getAccountsByName(
-        idlIx,
-        instruction.accounts,
-        [
-          'liquidity_book_config',
-          'token_mint_x',
-          'token_mint_y',
-          'bin_step_config',
-          'quote_asset_badge',
-          'pair',
-        ],
-      )
+      const accounts = LiquidityBookLibrary.getAccountsByName(idlIx, instruction.accounts, [
+        'liquidity_book_config',
+        'token_mint_x',
+        'token_mint_y',
+        'bin_step_config',
+        'quote_asset_badge',
+        'pair',
+      ])
 
       // Add type assertion for decodedIx.data
       const data = decodedIx.data as InitializePairArgs
@@ -145,7 +145,9 @@ export class InitializePairProcessor extends BaseProcessor {
       // 2. Get bin step config - throw error if not found (matching Rust logic)
       this.logger.log(`Retrieving bin step config: ${decoded.bin_step_config}`)
       const binStepConfigs = await this.binStepConfigModel.find().lean()
-      const binStepConfig = await this.binStepConfigModel.findOne({ id: decoded.bin_step_config }).lean()
+      const binStepConfig = await this.binStepConfigModel
+        .findOne({ id: decoded.bin_step_config })
+        .lean()
 
       if (!binStepConfig) {
         throw new Error(`Bin step config doesn't exist for pair ${decoded.pair}`)
@@ -195,14 +197,17 @@ export class InitializePairProcessor extends BaseProcessor {
 
       this.logger.log(`Pair created successfully: ${decoded.pair}`)
       this.logger.log(`Pair processing completed for: ${decoded.pair}`)
-
     } catch (error) {
       this.logger.error(`Error processing initialize pair: ${error.message}`)
       throw error
     }
   }
 
-  private async handleTokenMint(tokenMintId: string, label: string, session: any): Promise<TokenMintDocument | any> {
+  private async handleTokenMint(
+    tokenMintId: string,
+    label: string,
+    session: any,
+  ): Promise<TokenMintDocument | any> {
     this.logger.log(`Handling token mint ${label}: ${tokenMintId}`)
 
     try {
@@ -219,7 +224,6 @@ export class InitializePairProcessor extends BaseProcessor {
       const newTokenMint = await this.insertNewTokenMint(tokenMintId, session)
 
       return newTokenMint
-
     } catch (error) {
       this.logger.error(`Error handling token mint ${label} (${tokenMintId}): ${error.message}`)
       throw error
@@ -251,14 +255,16 @@ export class InitializePairProcessor extends BaseProcessor {
       }
 
       return { raw: 'Unable to parse mint data' }
-
     } catch (error) {
       this.logger.error(`Error fetching token info for ${tokenMintId}: ${error.message}`)
       return { error: error.message }
     }
   }
 
-  private async insertNewTokenMint(tokenMintId: string, session: any): Promise<TokenMintDocument | any> {
+  private async insertNewTokenMint(
+    tokenMintId: string,
+    session: any,
+  ): Promise<TokenMintDocument | any> {
     this.logger.log(`Creating new token mint: ${tokenMintId}`)
 
     try {
@@ -289,27 +295,27 @@ export class InitializePairProcessor extends BaseProcessor {
 
       this.logger.log(`Token mint created: ${tokenMintId}`)
       return createdTokenMint
-
     } catch (error) {
       this.logger.error(`Error inserting token mint ${tokenMintId}: ${error.message}`)
       throw error
     }
   }
 
-  private async fetchTokenMetadata(tokenMintId: string): Promise<{ name?: string; symbol?: string }> {
+  private async fetchTokenMetadata(
+    tokenMintId: string,
+  ): Promise<{ name?: string; symbol?: string }> {
     try {
       this.logger.log(`Fetching metadata for token: ${tokenMintId}`)
 
       // Use Metaplex SDK to get token metadata (cleaner approach)
       const metadata = await this.metaplex.nfts().findByMint({
-        mintAddress: new PublicKey(tokenMintId)
+        mintAddress: new PublicKey(tokenMintId),
       })
 
       return {
         name: metadata.name || `Token ${tokenMintId.slice(0, 8)}`,
         symbol: metadata.symbol || `TK${tokenMintId.slice(0, 4)}`,
       }
-
     } catch (error) {
       this.logger.error(`Error fetching token metadata for ${tokenMintId}: ${error.message}`)
 
@@ -317,7 +323,9 @@ export class InitializePairProcessor extends BaseProcessor {
       try {
         return await this.fetchTokenMetadataFallback(tokenMintId)
       } catch (fallbackError) {
-        this.logger.error(`Fallback metadata fetch also failed for ${tokenMintId}: ${fallbackError.message}`)
+        this.logger.error(
+          `Fallback metadata fetch also failed for ${tokenMintId}: ${fallbackError.message}`,
+        )
         return {
           name: 'Unknown',
           symbol: 'UNKNOWN',
@@ -326,7 +334,9 @@ export class InitializePairProcessor extends BaseProcessor {
     }
   }
 
-  private async fetchTokenMetadataFallback(tokenMintId: string): Promise<{ name?: string; symbol?: string }> {
+  private async fetchTokenMetadataFallback(
+    tokenMintId: string,
+  ): Promise<{ name?: string; symbol?: string }> {
     // Fallback method using raw account data parsing
     const connection = this.solanaService.getConnection()
     const mintPubkey = new PublicKey(tokenMintId)
@@ -334,12 +344,8 @@ export class InitializePairProcessor extends BaseProcessor {
     // Get metadata PDA
     const metadataProgram = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s')
     const [metadataPDA] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('metadata'),
-        metadataProgram.toBuffer(),
-        mintPubkey.toBuffer(),
-      ],
-      metadataProgram
+      [Buffer.from('metadata'), metadataProgram.toBuffer(), mintPubkey.toBuffer()],
+      metadataProgram,
     )
 
     // Fetch metadata account

@@ -20,7 +20,6 @@ import {
   PositionCreationEventDecoded,
 } from '../types/indexer.types'
 import bs58 from 'bs58'
-import { Instruction } from '../schemas/instruction.schema'
 import { ProcessorName } from '../types/enums'
 import { TokenAccount } from '../schemas/token-account.schema'
 import { LiquidityShares } from '../schemas/liquidity-shares.schema'
@@ -33,8 +32,6 @@ export class CreatePositionProcessor extends BaseProcessor {
   constructor(
     @InjectModel(Position.name)
     private readonly positionModel: Model<Position>,
-    @InjectModel(Instruction.name)
-    private readonly instructionModel: Model<Instruction>,
     @InjectModel(TokenAccount.name)
     private readonly tokenAccountModel: Model<TokenAccount>,
     @InjectModel(LiquidityShares.name)
@@ -45,25 +42,25 @@ export class CreatePositionProcessor extends BaseProcessor {
     super(CreatePositionProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
     try {
       await this.processCreatePosition(job.data)
       this.logJobComplete(job)
     } catch (error) {
-      await this.handleError(error, `processing position instruction ${job.data.instructionName}`)
+      await this.handleError(error, `processing position instruction ${job.data.signature}`)
     }
   }
 
   async processCreatePosition(input: ParsedInstructionMessage) {
     const {
-      block_number,
-      transaction_signature,
+      blockNumber,
+      signature,
       instruction,
-      instruction_index,
-      inner_instruction_index,
-      is_inner,
-      block_time,
+      instructionIndex,
+      innerInstructionIndex,
+      isInner,
+      blockTime,
     } = input
 
     const decodedData = Buffer.from(bs58.decode(instruction.data))
@@ -72,12 +69,12 @@ export class CreatePositionProcessor extends BaseProcessor {
     if (identifier.equals(INSTRUCTION_IDENTIFIER_POSITION_CREATE)) {
       return this.processInstruction(
         instruction,
-        block_number,
-        instruction_index,
-        inner_instruction_index,
-        transaction_signature,
-        is_inner,
-        block_time,
+        blockNumber,
+        instructionIndex,
+        innerInstructionIndex,
+        signature,
+        isInner,
+        blockTime,
       )
     }
 
@@ -86,12 +83,12 @@ export class CreatePositionProcessor extends BaseProcessor {
       if (discriminator.equals(EVENT_DISCRIMINATOR_POSITION_CREATE)) {
         return this.processEvent(
           eventData,
-          block_number,
-          instruction_index,
-          inner_instruction_index,
-          transaction_signature,
-          is_inner,
-          block_time,
+          blockNumber,
+          instructionIndex,
+          innerInstructionIndex,
+          signature,
+          isInner,
+          blockTime,
         )
       }
     }

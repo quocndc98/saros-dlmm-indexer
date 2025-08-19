@@ -5,19 +5,16 @@ export type BinSwapEventDocument = BinSwapEvent & Document
 
 @Schema({ timestamps: true })
 export class BinSwapEvent {
+  @Prop({ unique: true })
+  id: string // Format `{blockNumber}-{signature}-{instructionIndex}-{innerIndex}-{pairId}-{binId}`
+
   @Prop({ required: true })
-  id: string
-
-  @Prop({ required: true, index: true })
-  signature: string
-
-  @Prop({ required: true, index: true })
   pairId: string
 
-  @Prop({ required: true, index: true })
-  binId: string
+  @Prop({ required: true })
+  binId: string // Format `{pairId}-{lbBinId}`
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   lbBinId: number
 
   @Prop({ required: true })
@@ -35,7 +32,6 @@ export class BinSwapEvent {
   @Prop({ required: true })
   swapForY: boolean
 
-  // All amounts stored as normalized strings (matching Rust BigDecimal)
   @Prop({ required: true })
   amountIn: string
 
@@ -76,22 +72,21 @@ export class BinSwapEvent {
   volatilityAccumulator: number
 
   @Prop({ required: true })
-  index: number
-
-  @Prop({ required: true })
-  innerIndex: number
-
-  @Prop({ required: true })
   blockNumber: number
 
   @Prop({ required: true })
-  blockTime: Date
+  signature: string
+
+  @Prop({ required: true })
+  index: number
+
+  @Prop({ default: -1 })
+  innerIndex?: number
+
+  @Prop()
+  blockTime?: Date | null
 }
 
 export const BinSwapEventSchema = SchemaFactory.createForClass(BinSwapEvent)
 
-// Create indexes for efficient queries (matching Rust constraints)
-BinSwapEventSchema.index({ id: 1, chain: 1 }, { unique: true })
-BinSwapEventSchema.index({ pairId: 1, blockNumber: -1 })
-BinSwapEventSchema.index({ pairId: 1, lbBinId: 1, blockNumber: -1 })
-BinSwapEventSchema.index({ signature: 1, index: 1 })
+// TODO: Define indexes

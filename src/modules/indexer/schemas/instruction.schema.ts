@@ -3,62 +3,31 @@ import { Document } from 'mongoose'
 
 export type InstructionDocument = Instruction & Document
 
-@Schema({
-  timestamps: true, // Automatically adds createdAt and updatedAt
-})
+@Schema({ timestamps: true })
 export class Instruction {
-  @Prop({ 
-    type: String, 
-    required: true, 
-    unique: true,
-  })
+  @Prop({ required: true, unique: true })
   id: string // Format: {blockNumber}-{signature}-{processorName}-{instructionIndex}-{innerIndex}
 
-  @Prop({ 
-    type: String, 
-    required: true,
-  })
-  processorName: string // e.g., 'CreatePositionProcessor'
+  @Prop({ required: true })
+  processorName: string
 
-  @Prop({ 
-    type: String, 
-    required: true,
-    index: true 
-  })
-  signature: string // Transaction signature
+  @Prop({ required: true })
+  blockNumber: number
 
-  @Prop({ 
-    type: Number, 
-    required: true,
-  })
-  index: number // Instruction index in transaction
+  @Prop({ required: true })
+  signature: string
 
-  @Prop({ 
-    type: Number, 
-    required: false,
-    default: null 
-  })
-  innerIndex: number | null // Inner instruction index (null if not inner)
+  @Prop({ required: true })
+  index: number
 
-  @Prop({ 
-    type: Boolean, 
-    required: true,
-    default: false,
-  })
-  isInner: boolean // Whether this is an inner instruction
+  @Prop({ default: -1 })
+  innerIndex?: number
 
-  @Prop({ 
-    type: Number, 
-    required: true,
-  })
-  blockNumber: number // Block number where instruction was executed
+  @Prop({ required: true })
+  isInner: boolean
 
-  @Prop({ 
-    type: Date, 
-    required: false,
-    default: null,
-  })
-  blockTime: Date | null // Block timestamp
+  @Prop()
+  blockTime?: Date | null
 }
 
 export const InstructionSchema = SchemaFactory.createForClass(Instruction)

@@ -15,6 +15,7 @@ import {
 import { ProcessorName, QuoteAssetStatus, QuoteAssetType } from '../types/enums'
 import { EVENT_IDENTIFIER, TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { InstructionService } from '../services/instruction.service'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 // Constants from Rust
 const QUOTE_ASSET_INIT_EVENT_DISCRIMINATOR = Buffer.from([202, 110, 93, 186, 165, 96, 200, 27])
@@ -29,18 +30,18 @@ export class QuoteAssetProcessor extends BaseProcessor {
     super(QuoteAssetProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
       // Parse instruction data (matching Rust logic)
@@ -63,12 +64,12 @@ export class QuoteAssetProcessor extends BaseProcessor {
         if (decoded) {
           await this.processInitEvent(
             decoded,
-            block_number,
-            transaction_signature,
-            instruction_index,
-            inner_instruction_index,
-            is_inner,
-            block_time,
+            blockNumber,
+            signature,
+            instructionIndex,
+            innerInstructionIndex,
+            isInner,
+            blockTime,
           )
         }
       } else if (discriminator.equals(QUOTE_ASSET_UPDATE_EVENT_DISCRIMINATOR)) {
@@ -79,12 +80,12 @@ export class QuoteAssetProcessor extends BaseProcessor {
         if (decoded) {
           await this.processUpdateEvent(
             decoded,
-            block_number,
-            transaction_signature,
-            instruction_index,
-            inner_instruction_index,
-            is_inner,
-            block_time,
+            blockNumber,
+            signature,
+            instructionIndex,
+            innerInstructionIndex,
+            isInner,
+            blockTime,
           )
         }
       }

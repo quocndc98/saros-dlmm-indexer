@@ -39,10 +39,11 @@ export class PositionUpdateEvent {
   index: number // instruction_index
 
   @Prop({ default: -1 })
-  innerIndex: number
+  innerIndex?: number
 
-  @Prop({ required: true })
-  blockTime: Date
+  @Prop()
+  blockTime?: Date | null
+
 }
 
 export const PositionUpdateEventSchema = SchemaFactory.createForClass(PositionUpdateEvent)

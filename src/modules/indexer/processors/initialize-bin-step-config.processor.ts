@@ -11,6 +11,7 @@ import {
   StaticFeeParameters,
 } from '../../../liquidity-book/liquidity-book.type'
 import { ConfigAvailability, BinStepConfigStatus } from '../types/enums'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 interface InitializeBinStepConfigDecoded {
   bin_step: number
@@ -29,25 +30,25 @@ export class InitializeBinStepConfigProcessor extends BaseProcessor {
     super(InitializeBinStepConfigProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
       this.logger.log(
-        `Processing initialize bin step config instruction for signature: ${transaction_signature}`,
+        `Processing initialize bin step config instruction for signature: ${signature}`,
       )
       this.logger.log(
-        `Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`,
+        `Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`,
       )
 
       // Decode instruction data

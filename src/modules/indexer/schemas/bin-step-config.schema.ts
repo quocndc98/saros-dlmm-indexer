@@ -12,10 +12,10 @@ export class BinStepConfig {
   @Prop({ required: true })
   liquidityBookConfig: string
 
-  @Prop({ required: true, default: BinStepConfigStatus.Active })
+  @Prop({ enum: BinStepConfigStatus, default: BinStepConfigStatus.Active })
   status: BinStepConfigStatus
 
-  @Prop({ required: true })
+  @Prop({ enum: ConfigAvailability, required: true })
   availability: ConfigAvailability
 
   @Prop({ required: true })
@@ -44,3 +44,5 @@ export class BinStepConfig {
 }
 
 export const BinStepConfigSchema = SchemaFactory.createForClass(BinStepConfig)
+
+// TODO: Define indexes

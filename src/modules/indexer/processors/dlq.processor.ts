@@ -21,7 +21,7 @@ export class DlqProcessor extends BaseProcessor {
       const instruction = job.data
       const {
         signature,
-        slot,
+        blockNumber,
         blockTime,
         instructionIndex,
         instructionName,
@@ -32,7 +32,7 @@ export class DlqProcessor extends BaseProcessor {
       // Save failed instruction to DLQ
       const dlqEvent = new this.dlqEventModel({
         signature,
-        slot,
+        blockNumber,
         block_time: new Date(blockTime * 1000),
         instruction_index: instructionIndex,
         instruction_name: instructionName,

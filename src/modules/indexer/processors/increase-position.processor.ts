@@ -16,6 +16,7 @@ import { BIN_PER_POSITION } from '../constants/indexer.constants'
 import { splitAt } from '../../../utils/helper'
 import { EVENT_IDENTIFIER, EVENT_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { PositionIncreaseEvent } from '../../../liquidity-book/liquidity-book.type'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 const POSITION_INCREASE_EVENT_DISCRIMINATOR = [247, 40, 58, 113, 28, 175, 60, 174]
 
@@ -41,22 +42,22 @@ export class IncreasePositionProcessor extends BaseProcessor {
     super(IncreasePositionProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
-      this.logger.log(`Processing increase position event for signature: ${transaction_signature}`)
-      this.logger.log(`Block number: ${block_number}, Index: ${instruction_index}, Is inner: ${is_inner}`)
+      this.logger.log(`Processing increase position event for signature: ${signature}`)
+      this.logger.log(`Block number: ${blockNumber}, Index: ${instructionIndex}, Is inner: ${isInner}`)
 
       const decoded = this.decodeIncreasePositionEvent(instruction.data)
 
@@ -72,21 +73,21 @@ export class IncreasePositionProcessor extends BaseProcessor {
       })}`)
 
       const { isAlreadyProcessed, instruction: instructionCreated } = await this.instructionService.checkAndInsertInstruction({
-        blockNumber: block_number,
-        signature: transaction_signature,
+        blockNumber: blockNumber,
+        signature: signature,
         processorName: ProcessorName.IncreasePositionProcessor,
-        instructionIndex: instruction_index,
-        innerInstructionIndex: inner_instruction_index,
-        isInner: is_inner,
-        blockTime: block_time,
+        instructionIndex: instructionIndex,
+        innerInstructionIndex: innerInstructionIndex,
+        isInner: isInner,
+        blockTime: blockTime,
       })
 
       if (isAlreadyProcessed) {
-        this.logger.log(`Increase position event already processed for signature: ${transaction_signature}`)
+        this.logger.log(`Increase position event already processed for signature: ${signature}`)
         return
       }
 
-      await this.processIncreasePosition(decoded, transaction_signature, instructionCreated.id, instruction_index, inner_instruction_index, block_number, block_time)
+      await this.processIncreasePosition(decoded, signature, instructionCreated.id, instructionIndex, innerInstructionIndex, blockNumber, blockTime)
 
       this.logJobComplete(job)
     } catch (error) {

@@ -9,11 +9,8 @@ export class SwapEvent {
   @Prop({ required: true, unique: true })
   id: string // Format `<blockNumber>-<signature>-<instructionIndex>-<innerInstructionIndex>-<binId>`
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   pairId: string
-
-  @Prop({ required: true, index: true })
-  signature: string
 
   @Prop({ required: true })
   swapType: SwapType // ExactInput or ExactOutput
@@ -43,24 +40,24 @@ export class SwapEvent {
   userVaultY: string
 
   @Prop({ required: true })
-  instructionIndex: number
+  blockNumber: number
 
-  @Prop()
-  innerInstructionIndex?: number
+  @Prop({ required: true })
+  signature: string
+
+  @Prop({ required: true })
+  index: number
 
   @Prop({ required: true })
   isInner: boolean
 
-  @Prop({ required: true })
-  blockNumber: number
+  @Prop({ default: -1 })
+  innerIndex?: number
 
   @Prop()
-  blockTime?: number
+  blockTime?: Date | null
 }
 
 export const SwapEventSchema = SchemaFactory.createForClass(SwapEvent)
 
-// Create indexes for efficient queries
-SwapEventSchema.index({ id: 1 }, { unique: true })
-SwapEventSchema.index({ pairId: 1, blockNumber: -1 })
-SwapEventSchema.index({ signature: 1 })
+// TODO: Add indexes

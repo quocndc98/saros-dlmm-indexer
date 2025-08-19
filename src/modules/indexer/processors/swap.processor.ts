@@ -27,6 +27,7 @@ import {
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { ProcessorName, SwapType } from '../types/enums'
 import { InstructionService } from '../services/instruction.service'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 // Constants from Rust
 const INSTRUCTION_IDENTIFIER = [248, 198, 158, 145, 225, 117, 135, 200]
@@ -65,49 +66,49 @@ export class SwapProcessor extends BaseProcessor {
     super(SwapProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time,
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime,
       } = job.data
 
-      this.logger.log(`Processing swap instruction for signature: ${transaction_signature}`)
+      this.logger.log(`Processing swap instruction for signature: ${signature}`)
 
       // Parse instruction data (matching Rust logic)
       const decodedData = Buffer.from(bs58.decode(instruction.data))
       const [identifier, data] = splitAt(decodedData, 8)
 
-      if (Buffer.from(identifier).equals(Buffer.from(INSTRUCTION_IDENTIFIER))) {
+      if (identifier.equals(Buffer.from(INSTRUCTION_IDENTIFIER))) {
         // Handle swap instruction
         await this.processSwapInstruction(
           instruction,
-          transaction_signature,
-          block_number,
-          instruction_index,
-          inner_instruction_index,
-          is_inner,
-          block_time,
+          signature,
+          blockNumber,
+          instructionIndex,
+          innerInstructionIndex,
+          isInner,
+          blockTime,
         )
-      } else if (Buffer.from(identifier).equals(Buffer.from(EVENT_IDENTIFIER))) {
+      } else if (identifier.equals(Buffer.from(EVENT_IDENTIFIER))) {
         // Handle swap event
         const [discriminator, eventData] = splitAt(data, 8)
-        if (Buffer.from(discriminator).equals(Buffer.from(BIN_SWAP_EVENT_DISCRIMINATOR))) {
+        if (discriminator.equals(Buffer.from(BIN_SWAP_EVENT_DISCRIMINATOR))) {
           await this.processBinSwapEvent(
             eventData,
-            transaction_signature,
-            block_number,
-            instruction_index,
-            inner_instruction_index,
-            is_inner,
-            block_time,
+            signature,
+            blockNumber,
+            instructionIndex,
+            innerInstructionIndex,
+            isInner,
+            blockTime,
           )
         }
       }
@@ -173,11 +174,11 @@ export class SwapProcessor extends BaseProcessor {
         tokenVaultY: decoded.token_vault_y,
         userVaultX: decoded.user_vault_x,
         userVaultY: decoded.user_vault_y,
-        instructionIndex: instructionIndex,
-        innerInstructionIndex: innerInstructionIndex,
+        index: instructionIndex,
+        innerIndex: innerInstructionIndex,
         isInner: isInner,
         blockNumber: blockNumber,
-        blockTime: blockTime,
+        blockTime: blockTime ? new Date(blockTime * 1000) : null,
       }
 
       await this.swapEventModel.create(swapEventData)
@@ -509,7 +510,8 @@ export class SwapProcessor extends BaseProcessor {
     protocolFeeUsd: string
     protocolFeeNative: string
   } {
-    const { decoded, tokenMintX, tokenMintY, priceXUsd, priceXNative, priceYUsd, priceYNative } = params
+    const { decoded, tokenMintX, tokenMintY, priceXUsd, priceXNative, priceYUsd, priceYNative } =
+      params
 
     let amountInNormalized: string
     let amountOutNormalized: string
@@ -522,20 +524,38 @@ export class SwapProcessor extends BaseProcessor {
 
     if (decoded.swap_for_y) {
       // Swapping X -> Y
-      amountInNormalized = BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintX.decimals)
-      amountOutNormalized = BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintY.decimals)
+      amountInNormalized = BinMath.normalizeAmount(
+        decoded.amount_in.toString(),
+        tokenMintX.decimals,
+      )
+      amountOutNormalized = BinMath.normalizeAmount(
+        decoded.amount_out.toString(),
+        tokenMintY.decimals,
+      )
       feeNormalized = BinMath.normalizeAmount(decoded.fee.toString(), tokenMintX.decimals)
-      protocolFeeNormalized = BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintX.decimals)
+      protocolFeeNormalized = BinMath.normalizeAmount(
+        decoded.protocol_fee.toString(),
+        tokenMintX.decimals,
+      )
       priceInUsd = priceXUsd
       priceInNative = priceXNative
       priceOutUsd = priceYUsd
       priceOutNative = priceYNative
     } else {
       // Swapping Y -> X
-      amountInNormalized = BinMath.normalizeAmount(decoded.amount_in.toString(), tokenMintY.decimals)
-      amountOutNormalized = BinMath.normalizeAmount(decoded.amount_out.toString(), tokenMintX.decimals)
+      amountInNormalized = BinMath.normalizeAmount(
+        decoded.amount_in.toString(),
+        tokenMintY.decimals,
+      )
+      amountOutNormalized = BinMath.normalizeAmount(
+        decoded.amount_out.toString(),
+        tokenMintX.decimals,
+      )
       feeNormalized = BinMath.normalizeAmount(decoded.fee.toString(), tokenMintY.decimals)
-      protocolFeeNormalized = BinMath.normalizeAmount(decoded.protocol_fee.toString(), tokenMintY.decimals)
+      protocolFeeNormalized = BinMath.normalizeAmount(
+        decoded.protocol_fee.toString(),
+        tokenMintY.decimals,
+      )
       priceInUsd = priceYUsd
       priceInNative = priceYNative
       priceOutUsd = priceXUsd

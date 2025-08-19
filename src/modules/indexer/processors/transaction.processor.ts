@@ -9,7 +9,7 @@ import { SolanaService } from '../services/solana.service'
 import { TransactionParserService } from '../services/transaction-parser.service'
 import { TransactionEvent } from '../schemas/transaction-event.schema'
 import { QUEUE_NAME, JOB_TYPES } from '../../queue/queue.constant'
-import { ParsedInstructionMessage, ParsedTransactionMessage } from '../types/indexer.types'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 import { LiquidityBookLibrary } from '../../../liquidity-book/liquidity-book.library'
 import { EVENT_IDENTIFIER, EVENT_NAMES, INSTRUCTION_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { splitAt } from '../../../utils/helper'
@@ -104,8 +104,8 @@ export class TransactionProcessor extends BaseProcessor {
 
       // TODO: refactor this logic to handle events and instructions
       // Check if this is an inner instruction with events
-      if (instruction.is_inner) {
-        console.log(instruction.transaction_signature);
+      if (instruction.isInner) {
+        console.log(instruction.signature);
         const eventResult = this.tryHandleEvent(instruction.instruction.data)
         if (eventResult) {
           queueName = eventResult.queueName
@@ -129,7 +129,7 @@ export class TransactionProcessor extends BaseProcessor {
       await this.routeToQueue(queueName, jobType, instruction)
 
     } catch (error) {
-      this.logger.error(`Error processing transaction ${instruction.transaction_signature}:`, error)
+      this.logger.error(`Error processing transaction ${instruction.signature}:`, error)
 
       // Add to DLQ for failed instructions
       await this.dlqQueue.add(JOB_TYPES.PROCESS_DLQ, {

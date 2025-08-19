@@ -14,6 +14,7 @@ import { EVENT_IDENTIFIER } from '../../../liquidity-book/liquidity-book.constan
 import { TYPE_NAMES } from '../../../liquidity-book/liquidity-book.constant'
 import { InstructionService } from '../services/instruction.service'
 import { ProcessorName } from '../types/enums'
+import { ParsedInstructionMessage } from '../types/indexer.types'
 
 // Constants from Rust
 const COMPOSITION_FEES_EVENT_DISCRIMINATOR = Buffer.from([83, 234, 249, 47, 88, 125, 2, 86])
@@ -41,21 +42,21 @@ export class CompositionFeesProcessor extends BaseProcessor {
     super(CompositionFeesProcessor.name)
   }
 
-  async process(job: Job): Promise<void> {
+  async process(job: Job<ParsedInstructionMessage>): Promise<void> {
     this.logJobStart(job)
 
     try {
       const {
-        block_number,
-        transaction_signature,
+        blockNumber,
+        signature,
         instruction,
-        instruction_index,
-        inner_instruction_index,
-        is_inner,
-        block_time
+        instructionIndex,
+        innerInstructionIndex,
+        isInner,
+        blockTime
       } = job.data
 
-      this.logger.log(`Processing composition fees event for signature: ${transaction_signature}`)
+      this.logger.log(`Processing composition fees event for signature: ${signature}`)
 
       // Parse instruction data (matching Rust logic)
       const decodedData = Buffer.from(bs58.decode(instruction.data))
@@ -87,11 +88,11 @@ export class CompositionFeesProcessor extends BaseProcessor {
 
       // Process the composition fees event
       await this.processCompositionFeesEvent(decoded, {
-        block_number,
-        transaction_signature,
-        instruction_index,
-        inner_instruction_index,
-        block_time
+        block_number: blockNumber,
+        transaction_signature: signature,
+        instruction_index: instructionIndex,
+        inner_instruction_index: innerInstructionIndex,
+        block_time: blockTime
       })
 
       this.logJobComplete(job)
@@ -229,9 +230,9 @@ export class CompositionFeesProcessor extends BaseProcessor {
         protocolFeesYNative,
         protocolFeesYUsd,
         blockNumber: metadata.block_number,
-        blockTime: metadata.block_time,
-        instructionIndex: metadata.instruction_index,
-        innerInstructionIndex: metadata.inner_instruction_index,
+        blockTime: metadata.block_time ? new Date(metadata.block_time * 1000) : null,
+        index: metadata.instruction_index,
+        innerIndex: metadata.inner_instruction_index,
       }
 
       this.logger.log(`Creating composition fees event: ${eventId}`)

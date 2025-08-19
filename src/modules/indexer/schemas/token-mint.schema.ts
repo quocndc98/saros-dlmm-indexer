@@ -8,16 +8,16 @@ export class TokenMint {
   @Prop({ required: true, unique: true })
   id: string
 
-  @Prop({ required: true })
+  @Prop({})
   supply: string
 
-  @Prop({ required: true })
+  @Prop({})
   decimals: number
 
-  @Prop({ required: true })
+  @Prop({})
   name: string
 
-  @Prop({ required: true })
+  @Prop({})
   symbol: string
 }
 
