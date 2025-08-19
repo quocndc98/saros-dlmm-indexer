@@ -3,7 +3,7 @@ export const QUEUE_NAME = {
   TRANSACTION_PROCESSOR: 'transaction-processor',
   INSTRUCTION_PROCESSOR: 'instruction-processor',
   SWAP_PROCESSOR: 'swap-processor',
-  POSITION_PROCESSOR: 'position-processor',
+  CREATE_POSITION_PROCESSOR: 'create-position-processor',
   CLOSE_POSITION_PROCESSOR: 'close-position-processor',
   COMPOSITION_FEES_PROCESSOR: 'composition-fees-processor',
   DLQ_PROCESSOR: 'dlq-processor',

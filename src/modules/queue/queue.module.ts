@@ -34,7 +34,7 @@ import { REDIS_CLIENT } from '@/lib/modules/cache/cache.config'
       },
     }),
     BullModule.registerQueue({
-      name: QUEUE_NAME.POSITION_PROCESSOR,
+      name: QUEUE_NAME.CREATE_POSITION_PROCESSOR,
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: 'exponential', delay: 1000 },

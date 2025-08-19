@@ -20,7 +20,7 @@ export class TransactionProcessor extends BaseProcessor {
     private readonly solanaService: SolanaService,
     private readonly transactionParserService: TransactionParserService,
     @InjectQueue(QUEUE_NAME.SWAP_PROCESSOR) private readonly swapQueue: Queue,
-    @InjectQueue(QUEUE_NAME.POSITION_PROCESSOR) private readonly positionQueue: Queue,
+    @InjectQueue(QUEUE_NAME.CREATE_POSITION_PROCESSOR) private readonly createPositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.CLOSE_POSITION_PROCESSOR) private readonly closePositionQueue: Queue,
     @InjectQueue(QUEUE_NAME.COMPOSITION_FEES_PROCESSOR)
     private readonly compositionFeesQueue: Queue,
@@ -172,7 +172,7 @@ export class TransactionProcessor extends BaseProcessor {
           }
         case EVENT_NAMES.POSITION_CREATION_EVENT:
           return {
-            queueName: QUEUE_NAME.POSITION_PROCESSOR,
+            queueName: QUEUE_NAME.CREATE_POSITION_PROCESSOR,
             jobType: JOB_TYPES.PROCESS_POSITION_CREATE
           }
         default:
@@ -191,11 +191,11 @@ export class TransactionProcessor extends BaseProcessor {
       case INSTRUCTION_NAMES.SWAP:
         return { queueName: QUEUE_NAME.SWAP_PROCESSOR, jobType: JOB_TYPES.PROCESS_SWAP }
       case INSTRUCTION_NAMES.CREATE_POSITION:
-        return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CREATE }
-      case INSTRUCTION_NAMES.INCREASE_POSITION:
-        return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_INCREASE }
-      case INSTRUCTION_NAMES.DECREASE_POSITION:
-        return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_DECREASE }
+        return { queueName: QUEUE_NAME.CREATE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CREATE }
+      // case INSTRUCTION_NAMES.INCREASE_POSITION:
+      //   return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_INCREASE }
+      // case INSTRUCTION_NAMES.DECREASE_POSITION:
+      //   return { queueName: QUEUE_NAME.POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_DECREASE }
       case INSTRUCTION_NAMES.CLOSE_POSITION:
         return { queueName: QUEUE_NAME.CLOSE_POSITION_PROCESSOR, jobType: JOB_TYPES.PROCESS_POSITION_CLOSE }
       case INSTRUCTION_NAMES.COMPOSITION_FEES:
@@ -221,8 +221,8 @@ export class TransactionProcessor extends BaseProcessor {
       case QUEUE_NAME.SWAP_PROCESSOR:
         targetQueue = this.swapQueue
         break
-      case QUEUE_NAME.POSITION_PROCESSOR:
-        targetQueue = this.positionQueue
+      case QUEUE_NAME.CREATE_POSITION_PROCESSOR:
+        targetQueue = this.createPositionQueue
         break
       case QUEUE_NAME.CLOSE_POSITION_PROCESSOR:
         targetQueue = this.closePositionQueue
