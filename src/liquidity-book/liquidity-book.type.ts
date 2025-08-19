@@ -148,3 +148,7 @@ export enum QuoteAssetBadgeStatus {
   Disabled = 'DISABLED',
   Enabled = 'ENABLED',
 }
+
+export interface UpdatePairStaticFeeParametersArgs {
+  fee_parameters: StaticFeeParameters
+}

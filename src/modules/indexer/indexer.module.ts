@@ -37,6 +37,7 @@ import { ClosePositionProcessor } from './processors/close-position.processor'
 import { IncreasePositionProcessor } from './processors/increase-position.processor'
 import { DecreasePositionProcessor } from './processors/decrease-position.processor'
 import { CompositionFeesProcessor } from './processors/composition-fees.processor'
+import { UpdatePairStaticFeeParametersProcessor } from './processors/update-pair-static-fee-parameters.processor'
 import { InitializePairProcessor } from './processors/initialize-pair.processor'
 import { InitializeBinStepConfigProcessor } from './processors/initialize-bin-step-config.processor'
 import { InitializeBinArrayProcessor } from './processors/initialize-bin-array.processor'
@@ -97,6 +98,7 @@ import { LiquidityShares, LiquiditySharesSchema } from './schemas/liquidity-shar
     IncreasePositionProcessor,
     DecreasePositionProcessor,
     CompositionFeesProcessor,
+    UpdatePairStaticFeeParametersProcessor,
     InitializePairProcessor,
     InitializeBinStepConfigProcessor,
     InitializeBinArrayProcessor,

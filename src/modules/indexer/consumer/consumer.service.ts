@@ -12,6 +12,7 @@ import { InitializeBinArrayProcessor } from '../processors/initialize-bin-array.
 import { IncreasePositionProcessor } from '../processors/increase-position.processor'
 import { DecreasePositionProcessor } from '../processors/decrease-position.processor'
 import { ClosePositionProcessor } from '../processors/close-position.processor'
+import { UpdatePairStaticFeeParametersProcessor } from '../processors/update-pair-static-fee-parameters.processor'
 import { QUEUE_NAME } from '../../queue/queue.constant'
 import { Logger } from '@/lib'
 import { Worker } from 'bullmq'
@@ -32,6 +33,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
     private readonly createPositionProcessor: CreatePositionProcessor,
     private readonly closePositionProcessor: ClosePositionProcessor,
     private readonly compositionFeesProcessor: CompositionFeesProcessor,
+    private readonly updatePairStaticFeeParametersProcessor: UpdatePairStaticFeeParametersProcessor,
     private readonly initializePairProcessor: InitializePairProcessor,
     private readonly initializeBinStepConfigProcessor: InitializeBinStepConfigProcessor,
     private readonly initializeBinArrayProcessor: InitializeBinArrayProcessor,
@@ -131,6 +133,17 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
       }
     )
     this.workers.push(compositionFeesWorker)
+
+    // Update pair static fee parameters processor worker
+    const updatePairStaticFeeParametersWorker = new Worker(
+      QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR,
+      async (job) => await this.updatePairStaticFeeParametersProcessor.process(job),
+      {
+        connection: redisConnection,
+        concurrency: 3
+      }
+    )
+    this.workers.push(updatePairStaticFeeParametersWorker)
 
     // Initialize pair processor worker
     const initializePairWorker = new Worker(

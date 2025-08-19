@@ -32,6 +32,7 @@ export class TransactionProcessor extends BaseProcessor {
     @InjectQueue(QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR)
     private readonly initializeBinArrayQueue: Queue,
     @InjectQueue(QUEUE_NAME.QUOTE_ASSET_PROCESSOR) private readonly quoteAssetQueue: Queue,
+    @InjectQueue(QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR) private readonly updatePairStaticFeeParametersQueue: Queue,
     @InjectQueue(QUEUE_NAME.DLQ_PROCESSOR) private readonly dlqQueue: Queue,
     @InjectModel(TransactionEvent.name)
     private readonly transactionEventModel: Model<TransactionEvent>,
@@ -218,6 +219,8 @@ export class TransactionProcessor extends BaseProcessor {
         return { queueName: QUEUE_NAME.INITIALIZE_BIN_STEP_CONFIG_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_BIN_STEP_CONFIG }
       case INSTRUCTION_NAMES.INITIALIZE_BIN_ARRAY:
         return { queueName: QUEUE_NAME.INITIALIZE_BIN_ARRAY_PROCESSOR, jobType: JOB_TYPES.PROCESS_INITIALIZE_BIN_ARRAY }
+      case INSTRUCTION_NAMES.UPDATE_PAIR_STATIC_FEE_PARAMETERS:
+        return { queueName: QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR, jobType: JOB_TYPES.PROCESS_UPDATE_PAIR_STATIC_FEE_PARAMETERS }
       // case INSTRUCTION_NAMES.INITIALIZE_QUOTE_ASSET_BADGE:
       //   return { queueName: QUEUE_NAME.QUOTE_ASSET_PROCESSOR, jobType: JOB_TYPES.PROCESS_QUOTE_ASSET }
       default:
@@ -259,6 +262,9 @@ export class TransactionProcessor extends BaseProcessor {
         break
       case QUEUE_NAME.QUOTE_ASSET_PROCESSOR:
         targetQueue = this.quoteAssetQueue
+        break
+      case QUEUE_NAME.UPDATE_PAIR_STATIC_FEE_PARAMETERS_PROCESSOR:
+        targetQueue = this.updatePairStaticFeeParametersQueue
         break
       default:
         this.logger.warn(`Unknown queue: ${queueName}`)
