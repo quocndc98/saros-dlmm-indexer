@@ -144,7 +144,7 @@ export class IncreasePositionProcessor extends BaseProcessor {
   ): Promise<void> {
     try {
       this.logger.debug(`Checking if pair ${decoded.pair} exists...`)
-      const existingPair = await this.pairModel.exists({ id: decoded.pair }).lean()
+      const existingPair = await this.pairModel.findOne({ id: decoded.pair }).lean()
       if (!existingPair) {
         throw new Error(`Processing position increased event for non existent pair: ${decoded.pair}`)
       }
