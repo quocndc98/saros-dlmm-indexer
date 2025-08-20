@@ -38,7 +38,6 @@ export class TransactionProcessor extends BaseProcessor {
     private readonly transactionEventModel: Model<TransactionEvent>,
   ) {
     super(TransactionProcessor.name)
-    this.process({} as any) // FAST TEST HERE
   }
 
   async process(job: Job): Promise<void> {

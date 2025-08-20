@@ -43,7 +43,7 @@ export class ConsumerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     this.logger.log('Starting consumer workers...')
-    await this.startWorkers()
+    // await this.startWorkers()
   }
 
   async onModuleDestroy() {
